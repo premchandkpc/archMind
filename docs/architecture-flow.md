@@ -1,4 +1,4 @@
-# Architecture Flows — Phases 1–5
+# Architecture Flows — Phases 1–6
 
 ## Diagram legend
 
@@ -503,7 +503,92 @@ route_after_review(state)  → [workflow/graph.py:61]
 
 ---
 
-## File inventory (Phases 1-5)
+## 8. Agent Definitions (Phase 6)
+
+### CrewAI Agent Architecture
+
+```
+AgentFactory  → [agents/roles.py]
+  Creates 9 specialized agents:
+    planner, retriever, drawing_analyzer, compliance,
+    estimator, scheduler, risk_analyzer, reviewer, report_writer
+
+Each agent has:
+  - role: Human-readable name
+  - goal: What the agent tries to accomplish
+  - backstory: Domain expertise context
+  - tools: CrewAI tool wrappers bridging to project tools
+  - llm: LLM instance (openai/{LLM_CHAT_MODEL})
+```
+
+### Tool Wrappers
+
+```
+CrewAI tools  → [agents/tools.py]
+  VectorSearchTool   → wraps civilmind.tools.vector_search
+  SQLQueryTool       → wraps civilmind.tools.sql_query
+  CalculatorTool     → wraps civilmind.tools.calculator
+  OCRTool            → wraps civilmind.tools.ocr
+  VisionLLMTool      → wraps civilmind.tools.vision_llm
+  CodeSearchTool     → wraps civilmind.tools.code_search
+  WeatherAPITool     → stub implementation
+
+Pattern: CrewAI _run() → asyncio.run(project_tool.execute()) → str
+```
+
+### Crew Orchestration
+
+```
+CivilMindCrew  → [agents/crew.py]
+  __init__(project_id, question, documents, tools)
+    → AgentFactory.create_all() → 9 agents
+    → _create_tasks() → 9 tasks (one per agent)
+
+  run() → Crew.kickoff()
+    Process.hierarchical (planner delegates)
+    Memory enabled (long-term, short-term, entity)
+    Returns: final report from report_writer agent
+```
+
+### Execution Flow
+
+```
+CivilMindCrew.run()
+  │
+  ├─→ Planner Agent
+  │     └─ Creates task list, delegates
+  │
+  ├─→ Manager (LLM)
+  │     └─ Decides which agent runs next
+  │
+  ├─→ Retriever Agent
+  │     └─ Searches documents (vector_search + sql_query)
+  │
+  ├─→ Drawing Analyzer
+  │     └─ Analyzes floor plans (vision_llm + ocr)
+  │
+  ├─→ Compliance Agent
+  │     └─ Checks building codes (code_search)
+  │
+  ├─→ Estimator Agent
+  │     └─ Calculates quantities (calculator + sql_query)
+  │
+  ├─→ Scheduler Agent
+  │     └─ Creates timeline (calculator)
+  │
+  ├─→ Risk Analyzer
+  │     └─ Identifies risks (weather_api)
+  │
+  ├─→ Reviewer Agent
+  │     └─ Validates outputs (calculator)
+  │
+  └─→ Report Writer
+        └─ Generates final report
+```
+
+---
+
+## File inventory (Phases 1-6)
 
 ### Phase 1 — Foundation
 
@@ -559,6 +644,15 @@ route_after_review(state)  → [workflow/graph.py:61]
 | `civilmind/workflow/state.py` | `ProjectState`, `create_initial_state()`, 7 helper TypedDicts |
 | `civilmind/workflow/nodes.py` | 10 node functions, `NODE_REGISTRY`, `set_llm()` |
 | `civilmind/workflow/graph.py` | `build_graph()`, `route_after_planner()`, `route_after_review()` |
+
+### Phase 6 — Agents
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/agents/roles.py` | `AgentFactory`, 9 create_*() methods |
+| `civilmind/agents/tools.py` | 7 CrewAI tool wrappers bridging to project tools |
+| `civilmind/agents/crew.py` | `CivilMindCrew` — agent assembly and execution |
+| `civilmind/agents/__init__.py` | Public API exports |
 
 ---
 

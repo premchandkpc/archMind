@@ -258,7 +258,7 @@ async def reviewer_node(state: ProjectState) -> dict[str, Any]:
 
     cost_est = state.get("cost_estimation")
     if cost_est and cost_est.get("confidence", 0) < 0.5:
-            issues.append("Low confidence in cost estimation")
+        issues.append("Low confidence in cost estimation")
 
     critical = [v for v in state.get("violations", []) if v.get("severity") == "critical"]
     if critical:
