@@ -16,8 +16,6 @@ from civilmind.tools.base import BaseTool, ToolResult
 
 logger = structlog.get_logger()
 
-QUERY_TIMEOUT_SECONDS = 5
-MAX_ROWS = 1000
 READ_ONLY_KEYWORDS = frozenset(
     {"INSERT", "UPDATE", "DELETE", "DROP", "ALTER", "CREATE", "TRUNCATE", "GRANT", "REVOKE"}
 )
@@ -32,6 +30,8 @@ class SQLQueryTool(BaseTool):
 
     def __init__(self, dsn: str | None = None) -> None:
         self._dsn = dsn or settings.DATABASE_URL_SYNC
+        self._timeout = settings.SQL_QUERY_TIMEOUT_SECONDS
+        self._max_rows = settings.SQL_QUERY_MAX_ROWS
 
     async def execute(
         self,
@@ -67,16 +67,16 @@ class SQLQueryTool(BaseTool):
 
         conn: asyncpg.Connection | None = None
         try:
-            conn = await asyncpg.connect(self._dsn, command_timeout=QUERY_TIMEOUT_SECONDS)
+            conn = await asyncpg.connect(self._dsn, command_timeout=self._timeout)
             rows = await conn.fetch(query, *(params or []))
 
-            result = [dict(row) for row in rows[:MAX_ROWS]]
+            result = [dict(row) for row in rows[: self._max_rows]]
 
             logger.info(
                 "SQL query executed",
                 query_preview=query[:80],
                 rows_returned=len(result),
-                truncated=len(rows) > MAX_ROWS,
+                truncated=len(rows) > self._max_rows,
             )
 
             return ToolResult(
@@ -84,8 +84,8 @@ class SQLQueryTool(BaseTool):
                 data=result,
                 metadata={
                     "rows_returned": len(result),
-                    "truncated": len(rows) > MAX_ROWS,
-                    "max_rows": MAX_ROWS,
+                    "truncated": len(rows) > self._max_rows,
+                    "max_rows": self._max_rows,
                 },
             )
 
@@ -93,7 +93,7 @@ class SQLQueryTool(BaseTool):
             logger.warning("SQL query timed out", query_preview=query[:80])
             return ToolResult(
                 success=False,
-                error=f"Query timed out after {QUERY_TIMEOUT_SECONDS}s",
+                error=f"Query timed out after {self._timeout}s",
             )
 
         except Exception as e:

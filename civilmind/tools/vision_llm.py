@@ -1,4 +1,4 @@
-"""VisionLLMTool — image analysis via OpenCode Zen vision model.
+"""VisionLLMTool — image analysis via vision LLM.
 
 Agents use this for architectural drawing analysis, layout understanding, etc.
 """
@@ -9,35 +9,32 @@ import base64
 from pathlib import Path
 from typing import Any
 
-import httpx
 import structlog
 
+from civilmind.llm import LLMClient
 from civilmind.settings import settings
 from civilmind.tools.base import BaseTool, ToolResult
 
 logger = structlog.get_logger()
 
-MAX_IMAGE_SIZE_MB = 20
-DEFAULT_PROMPT = "Describe this architectural image in detail."
-
 
 class VisionLLMTool(BaseTool):
-    """Vision LLM analysis via OpenCode Zen (OpenAI-compatible)."""
+    """Vision LLM analysis via configured provider."""
 
     name = "vision_llm"
     description = "Analyze images using vision model"
     category = "vision"
 
     def __init__(self) -> None:
-        self._api_key = settings.OPENCODE_API_KEY
-        self._base_url = settings.OPENCODE_BASE_URL
-        self._model = settings.VISION_MODEL
+        self._client = LLMClient(settings.llm_vision_config)
+        self._max_image_size_mb = settings.VISION_MAX_IMAGE_SIZE_MB
+        self._default_prompt = settings.VISION_DEFAULT_PROMPT
 
     async def execute(
         self,
         image_path: str,
-        prompt: str = DEFAULT_PROMPT,
-        max_tokens: int = 4096,
+        prompt: str | None = None,
+        max_tokens: int | None = None,
         **kwargs: Any,
     ) -> ToolResult:
         """Analyze an image using the vision model.
@@ -56,71 +53,36 @@ class VisionLLMTool(BaseTool):
             return ToolResult(success=False, error=f"File not found: {image_path}")
 
         size_mb = path.stat().st_size / (1024 * 1024)
-        if size_mb > MAX_IMAGE_SIZE_MB:
+        if size_mb > self._max_image_size_mb:
             return ToolResult(
                 success=False,
-                error=f"Image too large: {size_mb:.1f}MB (max {MAX_IMAGE_SIZE_MB}MB)",
+                error=f"Image too large: {size_mb:.1f}MB (max {self._max_image_size_mb}MB)",
             )
 
-        # Encode image as base64
         image_data = base64.b64encode(path.read_bytes()).decode("utf-8")
         suffix = path.suffix.lower().lstrip(".")
         mime_map = {"jpg": "jpeg", "jpeg": "jpeg", "png": "png", "gif": "gif", "webp": "webp"}
         mime = f"image/{mime_map.get(suffix, 'jpeg')}"
 
-        payload = {
-            "model": self._model,
-            "messages": [
-                {
-                    "role": "user",
-                    "content": [
-                        {"type": "text", "text": prompt},
-                        {
-                            "type": "image_url",
-                            "image_url": {
-                                "url": f"data:{mime};base64,{image_data}",
-                            },
-                        },
-                    ],
-                }
-            ],
-            "max_tokens": max_tokens,
-        }
-
         try:
-            async with httpx.AsyncClient(timeout=60) as client:
-                resp = await client.post(
-                    f"{self._base_url}/chat/completions",
-                    headers={
-                        "Authorization": f"Bearer {self._api_key}",
-                        "Content-Type": "application/json",
-                    },
-                    json=payload,
-                )
-                resp.raise_for_status()
-                data = resp.json()
-
-            text = data["choices"][0]["message"]["content"]
-            tokens = data.get("usage", {}).get("total_tokens")
+            result = await self._client.vision(
+                image_data=image_data,
+                mime_type=mime,
+                prompt=prompt or self._default_prompt,
+                max_tokens=max_tokens,
+            )
 
             logger.info(
                 "Vision analysis completed",
-                model=self._model,
-                tokens=tokens,
+                model=result.model,
+                tokens=result.tokens_used,
             )
 
             return ToolResult(
                 success=True,
-                data=text,
-                tokens_used=tokens,
-                metadata={"model": self._model, "file": str(path)},
-            )
-
-        except httpx.HTTPStatusError as e:
-            logger.error("Vision API HTTP error", status=e.response.status_code)
-            return ToolResult(
-                success=False,
-                error=f"API error {e.response.status_code}: {e.response.text[:200]}",
+                data=result.content,
+                tokens_used=result.tokens_used,
+                metadata={"model": result.model, "file": str(path)},
             )
 
         except Exception as e:

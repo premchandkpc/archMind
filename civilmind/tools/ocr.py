@@ -10,11 +10,10 @@ from typing import Any
 
 import structlog
 
+from civilmind.settings import settings
 from civilmind.tools.base import BaseTool, ToolResult
 
 logger = structlog.get_logger()
-
-MAX_IMAGE_SIZE_MB = 20
 
 
 class OCRTool(BaseTool):
@@ -26,6 +25,7 @@ class OCRTool(BaseTool):
 
     def __init__(self) -> None:
         self._engine = None
+        self._max_size_mb = settings.OCR_MAX_IMAGE_SIZE_MB
 
     def _get_engine(self) -> Any:
         """Lazy-load PaddleOCR to avoid import-time cost."""
@@ -54,10 +54,10 @@ class OCRTool(BaseTool):
             return ToolResult(success=False, error=f"File not found: {image_path}")
 
         size_mb = path.stat().st_size / (1024 * 1024)
-        if size_mb > MAX_IMAGE_SIZE_MB:
+        if size_mb > self._max_size_mb:
             return ToolResult(
                 success=False,
-                error=f"Image too large: {size_mb:.1f}MB (max {MAX_IMAGE_SIZE_MB}MB)",
+                error=f"Image too large: {size_mb:.1f}MB (max {self._max_size_mb}MB)",
             )
 
         try:
