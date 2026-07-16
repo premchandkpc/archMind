@@ -142,13 +142,12 @@ class MinIOStorage:
 
     async def copy_file(self, source_key: str, dest_key: str) -> None:
         """Copy file within the same bucket."""
-        from minio.copy_conditions import CopyConditions
+        from minio.commonconfig import CopySource
 
         self._client.copy_object(
             self._bucket,
             dest_key,
-            f"{self._bucket}/{source_key}",
-            CopyConditions(),
+            CopySource(self._bucket, source_key),
         )
         logger.debug("Copied file", source=source_key, dest=dest_key)
 
