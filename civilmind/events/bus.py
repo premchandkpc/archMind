@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 import json
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import redis.asyncio as redis
 import structlog
@@ -31,7 +31,7 @@ class EventPublisher:
         Raises ValueError if event exceeds 10MB.
         """
         # Add metadata
-        event["_timestamp"] = datetime.now(timezone.utc).isoformat()
+        event["_timestamp"] = datetime.now(UTC).isoformat()
         event["_stream"] = stream
 
         payload = json.dumps(event, default=str)
@@ -68,9 +68,7 @@ class EventConsumer:
         try:
             # Create group if it doesn't exist
             try:
-                await self._redis.xgroup_create(
-                    stream, group, id="0", mkstream=True
-                )
+                await self._redis.xgroup_create(stream, group, id="0", mkstream=True)
             except redis.ResponseError as e:
                 if "BUSYGROUP" not in str(e):
                     raise
@@ -117,31 +115,25 @@ class EventConsumer:
         self, stream: str, group: str, consumer: str, count: int = 10
     ) -> list[dict]:
         """Get pending (unacknowledged) events for a consumer."""
-        results = await self._redis.xpending_range(
-            stream, group, min="-", max="+", count=count
-        )
+        results = await self._redis.xpending_range(stream, group, min="-", max="+", count=count)
         pending = []
         for entry in results:
-            pending.append({
-                "event_id": entry.get("message_id", ""),
-                "consumer": entry.get("consumer", ""),
-                "idle_ms": entry.get("idle", 0),
-                "delivery_count": entry.get("delivery_count", 0),
-            })
+            pending.append(
+                {
+                    "event_id": entry.get("message_id", ""),
+                    "consumer": entry.get("consumer", ""),
+                    "idle_ms": entry.get("idle", 0),
+                    "delivery_count": entry.get("delivery_count", 0),
+                }
+            )
         return pending
 
     async def claim_stale(
         self, stream: str, group: str, consumer: str, min_idle_ms: int = 300000
     ) -> list[str]:
         """Claim events idle for more than min_idle_ms (5 min default)."""
-        pending = await self._redis.xpending_range(
-            stream, group, min="-", max="+", count=100
-        )
-        stale_ids = [
-            entry["message_id"]
-            for entry in pending
-            if entry.get("idle", 0) > min_idle_ms
-        ]
+        pending = await self._redis.xpending_range(stream, group, min="-", max="+", count=100)
+        stale_ids = [entry["message_id"] for entry in pending if entry.get("idle", 0) > min_idle_ms]
         if stale_ids:
             claimed = await self._redis.xclaim(
                 stream, group, consumer, min_idle_ms=min_idle_ms, *stale_ids
@@ -162,9 +154,7 @@ class EventBus:
         """Publish event. Convenience method."""
         return await self.publisher.publish(stream, event)
 
-    async def consume(
-        self, stream: str, group: str, consumer: str, **kwargs
-    ) -> dict | None:
+    async def consume(self, stream: str, group: str, consumer: str, **kwargs) -> dict | None:
         """Consume event. Convenience method."""
         return await self.consumer.consume(stream, group, consumer, **kwargs)
 

@@ -23,14 +23,14 @@ class Settings(BaseSettings):
     POSTGRES_DB: str = "civilmind"
 
     @property
-    def DATABASE_URL(self) -> str:
+    def DATABASE_URL(self) -> str:  # noqa: N802
         return (
             f"postgresql+asyncpg://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
         )
 
     @property
-    def DATABASE_URL_SYNC(self) -> str:
+    def DATABASE_URL_SYNC(self) -> str:  # noqa: N802
         return (
             f"postgresql://{self.POSTGRES_USER}:{self.POSTGRES_PASSWORD}"
             f"@{self.POSTGRES_HOST}:{self.POSTGRES_PORT}/{self.POSTGRES_DB}"
@@ -42,7 +42,7 @@ class Settings(BaseSettings):
     QDRANT_COLLECTION: str = "civilmind"
 
     @property
-    def QDRANT_URL(self) -> str:
+    def QDRANT_URL(self) -> str:  # noqa: N802
         return f"http://{self.QDRANT_HOST}:{self.QDRANT_PORT}"
 
     # MinIO

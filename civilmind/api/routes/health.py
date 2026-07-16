@@ -13,6 +13,7 @@ router = APIRouter(tags=["health"])
 async def check_postgres() -> bool:
     try:
         import asyncpg
+
         conn = await asyncpg.connect(settings.DATABASE_URL)
         await conn.execute("SELECT 1")
         await conn.close()
@@ -42,6 +43,7 @@ async def check_minio() -> bool:
 async def check_neo4j() -> bool:
     try:
         from neo4j import AsyncGraphDatabase
+
         driver = AsyncGraphDatabase.driver(
             settings.NEO4J_URI, auth=(settings.NEO4J_USER, settings.NEO4J_PASSWORD)
         )

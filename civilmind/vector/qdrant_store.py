@@ -36,9 +36,7 @@ class QdrantStore:
         self._client = QdrantClient(url=url, api_key=api_key, timeout=30)
         self._url = url
 
-    async def create_collection(
-        self, name: str, dim: int = 768, recreate: bool = False
-    ) -> None:
+    async def create_collection(self, name: str, dim: int = 768, recreate: bool = False) -> None:
         """Create collection with cosine distance. Idempotent."""
         existing = [c.name for c in self._client.get_collections().collections]
 
@@ -129,20 +127,20 @@ class QdrantStore:
                 with_payload=True,
                 with_vectors=False,
             )
-            all_results.append([
-                SearchResult(
-                    id=str(point.id),
-                    score=point.score,
-                    payload=point.payload or {},
-                )
-                for point in result.points
-            ])
+            all_results.append(
+                [
+                    SearchResult(
+                        id=str(point.id),
+                        score=point.score,
+                        payload=point.payload or {},
+                    )
+                    for point in result.points
+                ]
+            )
 
         return all_results
 
-    async def delete_by_filter(
-        self, collection: str, filter_dict: dict[str, str]
-    ) -> None:
+    async def delete_by_filter(self, collection: str, filter_dict: dict[str, str]) -> None:
         """Delete all points matching filter."""
         search_filter = self._build_filter(filter_dict)
         self._client.delete(
@@ -168,9 +166,7 @@ class QdrantStore:
             "indexed_vectors_count": info.indexed_vectors_count,
             "segments_count": info.segments_count,
             "status": info.status.name if info.status else "unknown",
-            "optimizer_status": info.optimizer_status.name
-            if info.optimizer_status
-            else "unknown",
+            "optimizer_status": info.optimizer_status.name if info.optimizer_status else "unknown",
         }
 
     async def scroll(

@@ -58,10 +58,7 @@ class VectorSearchTool(BaseTool):
                 limit=top_k,
             )
 
-            data = [
-                {"id": r.id, "score": round(r.score, 4), "payload": r.payload}
-                for r in results
-            ]
+            data = [{"id": r.id, "score": round(r.score, 4), "payload": r.payload} for r in results]
 
             logger.info(
                 "Vector search completed",

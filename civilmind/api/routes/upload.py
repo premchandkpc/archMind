@@ -23,9 +23,10 @@ async def upload_file(
 ):
     suffix = Path(file.filename).suffix.lower()
     if suffix not in SUPPORTED_FORMATS:
+        supported = ", ".join(SUPPORTED_FORMATS.keys())
         raise HTTPException(
             status_code=400,
-            detail=f"Unsupported file type: {suffix}. Supported: {', '.join(SUPPORTED_FORMATS.keys())}",
+            detail=f"Unsupported file type: {suffix}. Supported: {supported}",
         )
 
     contents = await file.read()

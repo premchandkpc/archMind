@@ -20,35 +20,54 @@ REGULATIONS_DB: list[dict[str, str]] = [
         "code": "IBC",
         "section": "1004.5",
         "title": "Maximum Occupant Load",
-        "text": "The occupant load of a floor or other portion of a building shall be determined by dividing the floor area by the occupant load factor.",
+        "text": (
+            "The occupant load of a floor or other portion of a building "
+            "shall be determined by dividing the floor area by the occupant "
+            "load factor."
+        ),
         "source": "International Building Code 2021",
     },
     {
         "code": "IBC",
         "section": "903.2.1",
         "title": "Automatic Sprinkler Systems — Group A",
-        "text": "An automatic sprinkler system shall be provided throughout all new Group A occupancies.",
+        "text": (
+            "An automatic sprinkler system shall be provided throughout "
+            "all new Group A occupancies."
+        ),
         "source": "International Building Code 2021",
     },
     {
         "code": "ACI",
         "section": "318-19 5.3",
         "title": "Concrete Strength Requirements",
-        "text": "Concrete shall be designed to have adequate strength for the intended purpose. Specified compressive strength fc' shall be not less than 3000 psi for structural applications.",
+        "text": (
+            "Concrete shall be designed to have adequate strength for the "
+            "intended purpose. Specified compressive strength fc' shall be "
+            "not less than 3000 psi for structural applications."
+        ),
         "source": "ACI 318-19",
     },
     {
         "code": "ASCE",
         "section": "7-22 12.2",
         "title": "Seismic Base Shear",
-        "text": "The seismic base shear V shall be determined in accordance with the following equation: V = Cs × W, where Cs is the seismic response coefficient and W is the effective seismic weight.",
+        "text": (
+            "The seismic base shear V shall be determined in accordance "
+            "with the following equation: V = Cs x W, where Cs is the "
+            "seismic response coefficient and W is the effective seismic "
+            "weight."
+        ),
         "source": "ASCE 7-22",
     },
     {
         "code": "IECC",
         "section": "C402.1.3",
         "title": "Insulation Requirements — Roof",
-        "text": "Roof insulation requirements for commercial buildings: minimum R-30 continuous insulation for climate zones 4-8.",
+        "text": (
+            "Roof insulation requirements for commercial buildings: "
+            "minimum R-30 continuous insulation for climate zones 4-8."
+        ),
         "source": "International Energy Conservation Code 2021",
     },
 ]

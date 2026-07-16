@@ -18,6 +18,7 @@ APP    := civilmind.api.app:app
 HOST   := 0.0.0.0
 PORT   := 8000
 WORKERS := 1
+export PYTHONPATH := $(CURDIR)
 
 # ============================================================
 # HELP
@@ -88,22 +89,10 @@ test-unit: ## Run unit tests only (no live services)
 	$(PYTHON) -m pytest tests/ -v --ignore=tests/live
 
 test-live: ## Run live integration tests (requires Docker services)
-	$(PYTHON) -c "from civilmind.api.app import create_app; \
-		from fastapi.testclient import TestClient; \
-		r = TestClient(create_app()).get('/health'); \
-		print(r.json())"
+	@$(PYTHON) scripts/health_check.py
 
 test-tools: ## Test tool registry and base classes
-	$(PYTHON) -m pytest tests/ -v -k "tool" 2>/dev/null || \
-	$(PYTHON) -c "\
-	from civilmind.tools.base import BaseTool, ToolResult; \
-	from civilmind.tools.registry import ToolRegistry; \
-	class T(BaseTool): \
-	    name='t'; description='t'; category='test'; \
-	    async def execute(self, **kw): return ToolResult(success=True); \
-	r = ToolRegistry(); r.register(T()); \
-	assert r.has('t'); assert len(r.list_tools()) == 1; \
-	print('[OK] Tool registry works')"
+	@$(PYTHON) scripts/test_tools.py
 
 # ============================================================
 # RUN
@@ -138,16 +127,7 @@ db-history: ## Show migration history
 	$(PYTHON) -m alembic history
 
 db-reset: ## DANGEROUS: drop all tables and re-migrate
-	$(PYTHON) -c "\
-	import asyncio, asyncpg; \
-	async def reset(): \
-	    c = await asyncpg.connect('postgresql://civilmind:civilmind@localhost:5432/civilmind'); \
-	    await c.execute('DROP SCHEMA public CASCADE; CREATE SCHEMA public'); \
-	    await c.close(); \
-	    print('Schema dropped'); \
-	asyncio.run(reset())"
-	$(PYTHON) -m alembic upgrade head
-	@echo "Database reset complete"
+	@$(PYTHON) scripts/db_reset.py
 
 # ============================================================
 # DOCKER — ALL SERVICES
@@ -239,34 +219,9 @@ docker-redis: ## Start Redis only
 # ============================================================
 
 health: ## Check all service connectivity
-	@$(PYTHON) -c "\
-	import asyncio, httpx; \
-	async def check(): \
-	    results = {}; \
-	    import asyncpg; \
-	    try: \
-	        c = await asyncpg.connect('postgresql://civilmind:civilmind@localhost:5432/civilmind'); \
-	        await c.execute('SELECT 1'); await c.close(); \
-	        results['postgres'] = True \
-	    except: results['postgres'] = False; \
-	    async with httpx.AsyncClient() as h: \
-	        r = await h.get('http://localhost:6333/healthz'); results['qdrant'] = r.status_code == 200; \
-	        r = await h.get('http://localhost:9000/minio/health/live'); results['minio'] = r.status_code == 200; \
-	    from neo4j import AsyncGraphDatabase; \
-	    d = AsyncGraphDatabase.driver('bolt://localhost:7687', auth=('neo4j','password')); \
-	    await d.verify_connectivity(); await d.close(); results['neo4j'] = True \
-	    except: results['neo4j'] = False; \
-	    import redis.asyncio as aioredis; \
-	    r = aioredis.from_url('redis://localhost:6379/0'); await r.ping(); await r.aclose(); \
-	    results['redis'] = True \
-	    except: results['redis'] = False; \
-	    return results; \
-	r = asyncio.run(check()); \
-	[print(f'  {\"[OK]\" if v else \"[--]\"} {k}') for k, v in r.items()]; \
-	print(f'  All healthy: {all(r.values())}')"
+	@$(PYTHON) scripts/health_check.py
 
 check-all: health ## Alias for health
-	@true
 
 # ============================================================
 # BUILD

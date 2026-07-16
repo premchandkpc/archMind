@@ -1,7 +1,7 @@
 """SQLAlchemy ORM models — 4 tables tracking the project lifecycle."""
 
 import uuid
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 from sqlalchemy import DateTime, ForeignKey, Integer, String, Text
 from sqlalchemy.dialects.postgresql import JSONB
@@ -15,7 +15,7 @@ def _uuid() -> str:
 
 
 def _utcnow() -> datetime:
-    return datetime.now(timezone.utc)
+    return datetime.now(UTC)
 
 
 class Project(Base):

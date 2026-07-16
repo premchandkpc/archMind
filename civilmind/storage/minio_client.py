@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 
 import structlog
 from minio import Minio
@@ -100,9 +100,9 @@ class MinIOStorage:
                 FileInfo(
                     key=obj.object_name,
                     size=obj.size,
-                    last_modified=obj.last_modified.replace(tzinfo=timezone.utc)
+                    last_modified=obj.last_modified.replace(tzinfo=UTC)
                     if obj.last_modified
-                    else datetime.now(timezone.utc),
+                    else datetime.now(UTC),
                     etag=obj.etag or "",
                     content_type=obj.content_type or "application/octet-stream",
                 )
@@ -113,7 +113,9 @@ class MinIOStorage:
         """Generate temporary download URL (no auth needed)."""
         from datetime import timedelta
 
-        url = self._client.presigned_get_object(self._bucket, key, expires=timedelta(seconds=expires))
+        url = self._client.presigned_get_object(
+            self._bucket, key, expires=timedelta(seconds=expires)
+        )
         return url
 
     async def file_exists(self, key: str) -> bool:
@@ -131,9 +133,9 @@ class MinIOStorage:
             return FileInfo(
                 key=stat.object_name,
                 size=stat.size,
-                last_modified=stat.last_modified.replace(tzinfo=timezone.utc)
+                last_modified=stat.last_modified.replace(tzinfo=UTC)
                 if stat.last_modified
-                else datetime.now(timezone.utc),
+                else datetime.now(UTC),
                 etag=stat.etag or "",
                 content_type=stat.content_type or "application/octet-stream",
             )
