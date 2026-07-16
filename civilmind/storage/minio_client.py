@@ -111,7 +111,9 @@ class MinIOStorage:
 
     async def get_presigned_url(self, key: str, expires: int = 3600) -> str:
         """Generate temporary download URL (no auth needed)."""
-        url = self._client.presigned_get_object(self._bucket, key, expires=expires)
+        from datetime import timedelta
+
+        url = self._client.presigned_get_object(self._bucket, key, expires=timedelta(seconds=expires))
         return url
 
     async def file_exists(self, key: str) -> bool:
