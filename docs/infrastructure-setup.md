@@ -4,6 +4,9 @@
 
 ## Quick Start
 
+> **Bootstrap only.** These raw commands set up services for the first time.
+> For day-to-day operations, use `make docker-up` / `make docker-down` / `make db-migrate`.
+
 ```bash
 # 1. Create .env (required for settings validation)
 cp .env.example .env

@@ -262,3 +262,15 @@ Mypy runs in strict mode with `pydantic.mypy` plugin. Ruff enforces: E, F, I, N,
 - `civilmind/` — all application code
 - `scripts/` — standalone scripts (health checks, DB reset, tool tests)
 - `plan/` — phase completion tracking
+
+## Doc Rules — Plan Hygiene
+
+### Renumbering a plan file
+
+Whenever a `plan/N.M-*.md` file is renumbered or split:
+
+1. **Rename the file** to `plan/NEW.NEW-*.md`.
+2. **Update the H1 header** to match the new filename number exactly.
+3. **Grep all other `plan/*.md`** for references to the old number (e.g. "Chunk 2.4", "Requires 4.1") and update those too.
+4. **If Status is "Done"**, verify the claimed file(s) actually exist and are non-stub before trusting the label.
+5. **Never leave 0-byte or duplicate-content files in `plan/`** — either finish them or delete before committing.
