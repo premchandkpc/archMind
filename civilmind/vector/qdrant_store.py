@@ -169,8 +169,9 @@ class QdrantStore:
         info = self._client.get_collection(collection)
         return {
             "name": collection,
-            "vectors_count": info.vectors_count,
             "points_count": info.points_count,
+            "indexed_vectors_count": info.indexed_vectors_count,
+            "segments_count": info.segments_count,
             "status": info.status.name if info.status else "unknown",
             "optimizer_status": info.optimizer_status.name
             if info.optimizer_status
