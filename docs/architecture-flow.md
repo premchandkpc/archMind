@@ -1,4 +1,4 @@
-# Architecture Flows — Phases 1–3
+# Architecture Flows — Phases 1–5
 
 ## Diagram legend
 
@@ -388,7 +388,122 @@ Tool: CodeSearchTool → [tools/code_search.py]
 
 ---
 
-## File inventory (Phases 1-3)
+## 6. Hybrid Retrieval (Phase 4)
+
+### BM25 + Vector Search
+
+```
+HybridRetriever.retrieve(query, project_id)  → [retrieval/hybrid.py]
+
+  1. BM25 keyword search:
+     BM25Index.search(query, top_k=20)  → [retrieval/bm25_index.py]
+       → tokenizes query, scores against inverted index
+       → returns list[BM25Result(id, score)]
+
+  2. Vector semantic search:
+     VectorSearchTool.execute(query_vector, project_id, top_k=20)
+       → QdrantStore.search(collection="civilmind", query_vector=[...], limit=20)
+       → returns list[SearchResult(id, score, payload)]
+
+  3. RRF merge:
+     reciprocal_rank_fusion bm25_results + vector_results
+       → score = Σ 1/(k + rank_i)  (k=60)
+       → merges duplicates, returns top 30
+
+  4. Rerank:
+     CrossEncoderReranker.rerank(query, merged_chunks, top_k=10)
+       → sentence-transformers CrossEncoder model
+       → scores each (query, chunk) pair
+       → returns top 10 by relevance
+
+  Returns: list[RetrievedChunk] with id, content, score, source, metadata
+```
+
+---
+
+## 7. Workflow Graph (Phase 5)
+
+### LangGraph State Flow
+
+```
+START → planner → router
+                    |
+        +-----------+-----------+
+        |           |           |
+    retriever  estimator  compliance
+        |           |           |
+        +-----------+-----------+
+                    |
+                  reviewer
+                    |
+            +-------+-------+
+            |               |
+         reporter      planner (loop back if issues)
+            |
+           END
+```
+
+### State Model
+
+```
+ProjectState (TypedDict)  → [workflow/state.py]
+  Input:     project_id, question, document_ids
+  Retrieval: retrieved_chunks (Annotated[add_messages])
+  Analysis:  drawing_analysis, violations, cost_estimation, schedule, risk_assessment
+  Review:    review_feedback
+  Output:    final_answer
+  Control:   messages, iteration, needs_human_approval, current_node, next_nodes
+  Memory:    context (dict)
+```
+
+### Node Execution
+
+```
+planner_node(state)  → [workflow/nodes.py:47]
+  LLM call → analyzes question, returns tasks + required_nodes
+  → sets next_nodes for routing
+
+retriever_node(state)  → [workflow/nodes.py:81]
+  Will use HybridRetriever (Phase 4)
+  → returns retrieved_chunks
+
+compliance_node(state)  → [workflow/nodes.py:97]
+  LLM call → checks building codes against retrieved context
+  → returns violations
+
+estimator_node(state)  → [workflow/nodes.py:138]
+  LLM call → calculates quantities and costs
+  → returns cost_estimation
+
+reviewer_node(state)  → [workflow/nodes.py:246]
+  Checks: chunks exist, confidence > 0.5, no critical violations
+  → if issues + iteration < 3: loop back to planner
+  → else: proceed to reporter
+
+reporter_node(state)  → [workflow/nodes.py:289]
+  LLM call → generates final markdown report
+  → sets final_answer
+```
+
+### Routing Logic
+
+```
+route_after_planner(state)  → [workflow/graph.py:43]
+  Maps planner output to node names:
+    "retrieval" → "retriever"
+    "estimation" → "estimator"
+    "compliance_check" → "compliance"
+  → picks first node from list
+
+route_after_review(state)  → [workflow/graph.py:63]
+  if review_feedback.is_valid → "reporter"
+  if iteration < MAX_ITERATIONS → "planner" (loop)
+  else → "reporter" (force exit)
+```
+
+---
+
+## File inventory (Phases 1-5)
 
 ### Phase 1 — Foundation
 
@@ -427,6 +542,23 @@ Tool: CodeSearchTool → [tools/code_search.py]
 | `civilmind/pipeline/embedder.py` | `EmbedderFactory`, `BaseEmbedder`, `CachedEmbedder`, `BGEEmbedder`, `OpenCodeEmbedder` |
 | `civilmind/events/handlers.py` | `handle_document_uploaded`, `handle_document_parsed`, `handle_document_chunked`, `handle_document_embedded` |
 | `civilmind/events/workers.py` | `PipelineWorker` |
+
+### Phase 4 — Retrieval
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/retrieval/bm25_index.py` | `BM25Index`, `BM25Result` |
+| `civilmind/retrieval/hybrid.py` | `HybridRetriever`, `retrieve()` |
+| `civilmind/retrieval/reranker.py` | `CrossEncoderReranker`, `rerank()` |
+| `civilmind/retrieval/compressor.py` | `ContextCompressor` |
+
+### Phase 5 — Workflow
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/workflow/state.py` | `ProjectState`, `create_initial_state()`, 7 helper TypedDicts |
+| `civilmind/workflow/nodes.py` | 10 node functions, `NODE_REGISTRY`, `set_llm()` |
+| `civilmind/workflow/graph.py` | `build_graph()`, `route_after_planner()`, `route_after_review()` |
 
 ---
 
