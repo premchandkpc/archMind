@@ -71,7 +71,7 @@ PipelineWorker._get_handler("document.uploaded")
   → handle_document_uploaded(event, parser, chunker, bus)  → [events/handlers.py:27]
 
   Calls: parser.parse("uploads/proj-101/docs/a1b2c3d4-....pdf")
-         → [pipeline/parser.py:54] DocumentParser._parse_pdf()
+         → [pipeline/parser.py:79] DocumentParser._parse_pdf()
 
   Unstructured.partition_pdf(strategy="hi_res"):
     Returns list of elements classified by type(element).__name__:
@@ -160,7 +160,7 @@ handle_document_parsed(event, chunker, bus)  → [events/handlers.py:66]
     When buffer ≥ 1000 chars → flush via _fixed_split(text, meta)
 
   Metadata extracted via:
-    extract_metadata(text) → [pipeline/metadata.py:101]
+    extract_metadata(text) → [pipeline/metadata.py:85]
       → measurements: ["M25", "50 cum", "2000 kg"]
       → code_references: []
       → keywords: {"concrete", "steel", "foundation"}
@@ -459,28 +459,28 @@ ProjectState (TypedDict)  → [workflow/state.py]
 ### Node Execution
 
 ```
-planner_node(state)  → [workflow/nodes.py:47]
+planner_node(state)  → [workflow/nodes.py:48]
   LLM call → analyzes question, returns tasks + required_nodes
   → sets next_nodes for routing
 
-retriever_node(state)  → [workflow/nodes.py:81]
+retriever_node(state)  → [workflow/nodes.py:79]
   Will use HybridRetriever (Phase 4)
   → returns retrieved_chunks
 
-compliance_node(state)  → [workflow/nodes.py:97]
+compliance_node(state)  → [workflow/nodes.py:113]
   LLM call → checks building codes against retrieved context
   → returns violations
 
-estimator_node(state)  → [workflow/nodes.py:138]
+estimator_node(state)  → [workflow/nodes.py:148]
   LLM call → calculates quantities and costs
   → returns cost_estimation
 
-reviewer_node(state)  → [workflow/nodes.py:246]
+reviewer_node(state)  → [workflow/nodes.py:245]
   Checks: chunks exist, confidence > 0.5, no critical violations
   → if issues + iteration < 3: loop back to planner
   → else: proceed to reporter
 
-reporter_node(state)  → [workflow/nodes.py:289]
+reporter_node(state)  → [workflow/nodes.py:300]
   LLM call → generates final markdown report
   → sets final_answer
 ```
@@ -488,14 +488,14 @@ reporter_node(state)  → [workflow/nodes.py:289]
 ### Routing Logic
 
 ```
-route_after_planner(state)  → [workflow/graph.py:43]
+route_after_planner(state)  → [workflow/graph.py:45]
   Maps planner output to node names:
     "retrieval" → "retriever"
     "estimation" → "estimator"
     "compliance_check" → "compliance"
   → picks first node from list
 
-route_after_review(state)  → [workflow/graph.py:63]
+route_after_review(state)  → [workflow/graph.py:61]
   if review_feedback.is_valid → "reporter"
   if iteration < MAX_ITERATIONS → "planner" (loop)
   else → "reporter" (force exit)
