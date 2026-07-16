@@ -186,7 +186,7 @@ cython_debug/
 #   be found at https://github.com/github/gitignore/blob/main/Global/JetBrains.gitignore
 #   and can be added to the global gitignore or merged into this file.  For a more nuclear
 #   option (not recommended) you can uncomment the following to ignore the entire idea folder.
-# .idea/
+.idea/
 
 # Abstra
 #   Abstra is an AI-powered process automation framework.
@@ -216,3 +216,44 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+# =============================================================
+# CivilMind AI — Project-specific
+# =============================================================
+
+# Uploads (local file storage, use MinIO in prod)
+uploads/
+
+# Generated reports
+reports/
+
+# Temporary processing files
+temp/
+tmp/
+
+# OCR / ML model cache
+models/
+*.onnx
+*.paddle
+paddleocr/
+tesseract/
+
+# Embedding cache
+.cache/
+sentence_transformers/
+
+# Docker volumes
+docker-data/
+docker-compose.override.yml
+
+# Logs
+logs/
+*.log
+
+# Plan artifacts (regenerated)
+plan.zip
+
+# Database backups
+backups/
+*.sql
+*.dump
