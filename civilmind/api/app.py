@@ -1,5 +1,6 @@
 """FastAPI application factory."""
 
+import asyncio
 import uuid
 from contextlib import asynccontextmanager
 
@@ -8,16 +9,39 @@ from fastapi import FastAPI, Request
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import JSONResponse
 
+from civilmind.events.bus import EventBus
+from civilmind.events.workers import PipelineWorker
 from civilmind.settings import settings
 
 logger = structlog.get_logger()
 
+_worker_task: asyncio.Task | None = None
+
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    global _worker_task
     logger.info("Starting CivilMind AI", version="0.1.0")
     app.state.services = {}
+
+    bus = EventBus(redis_url=settings.REDIS_URL)
+    app.state.event_bus = bus
+    app.state.services["event_bus"] = bus
+
+    worker = PipelineWorker(bus, consumer_name="worker-1")
+    _worker_task = asyncio.create_task(worker.run())
+    logger.info("Pipeline worker started")
+
     yield
+
+    if _worker_task:
+        worker.stop()
+        _worker_task.cancel()
+        try:
+            await _worker_task
+        except asyncio.CancelledError:
+            pass
+
     for name, client in app.state.services.items():
         try:
             if hasattr(client, "close"):
