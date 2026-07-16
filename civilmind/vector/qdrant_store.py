@@ -91,9 +91,9 @@ class QdrantStore:
         """Vector search with optional metadata filters."""
         search_filter = self._build_filter(filter_dict)
 
-        results = self._client.search(
+        result = self._client.query_points(
             collection_name=collection,
-            query_vector=query_vector,
+            query=query_vector,
             query_filter=search_filter,
             limit=limit,
             with_payload=True,
@@ -102,11 +102,11 @@ class QdrantStore:
 
         return [
             SearchResult(
-                id=str(hit.id),
-                score=hit.score,
-                payload=hit.payload or {},
+                id=str(point.id),
+                score=point.score,
+                payload=point.payload or {},
             )
-            for hit in results
+            for point in result.points
         ]
 
     async def search_batch(
@@ -116,34 +116,29 @@ class QdrantStore:
         filter_dict: dict[str, str] | None = None,
         limit: int = VECTOR_TOP_K,
     ) -> list[list[SearchResult]]:
-        """Batch search — multiple queries in one round-trip."""
+        """Batch search — multiple queries executed sequentially."""
         search_filter = self._build_filter(filter_dict)
 
-        results = self._client.search_batch(
-            collection_name=collection,
-            requests=[
-                models.SearchRequest(
-                    vector=qv,
-                    filter=search_filter,
-                    limit=limit,
-                    with_payload=True,
-                    with_vectors=False,
-                )
-                for qv in query_vectors
-            ],
-        )
-
-        return [
-            [
+        all_results = []
+        for qv in query_vectors:
+            result = self._client.query_points(
+                collection_name=collection,
+                query=qv,
+                query_filter=search_filter,
+                limit=limit,
+                with_payload=True,
+                with_vectors=False,
+            )
+            all_results.append([
                 SearchResult(
-                    id=str(hit.id),
-                    score=hit.score,
-                    payload=hit.payload or {},
+                    id=str(point.id),
+                    score=point.score,
+                    payload=point.payload or {},
                 )
-                for hit in batch
-            ]
-            for batch in results
-        ]
+                for point in result.points
+            ])
+
+        return all_results
 
     async def delete_by_filter(
         self, collection: str, filter_dict: dict[str, str]
