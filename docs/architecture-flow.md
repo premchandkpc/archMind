@@ -1,4 +1,4 @@
-# Architecture Flows — Phases 1–6
+# Architecture Flows — Phases 1–7
 
 ## Diagram legend
 
@@ -428,11 +428,11 @@ HybridRetriever.retrieve(query, project_id)  → [retrieval/hybrid.py]
 ```
 START → planner → router
                     |
-        +-----------+-----------+
-        |           |           |
-    retriever  estimator  compliance
-        |           |           |
-        +-----------+-----------+
+        +-----------+-----------+-----------+
+        |           |           |           |
+    retriever  estimator  compliance  analysis_crew
+        |           |           |       (CrewAI)
+        +-----------+-----------+-----------+
                     |
                   reviewer
                     |
@@ -450,6 +450,7 @@ ProjectState (TypedDict)  → [workflow/state.py]
   Input:     project_id, question, document_ids
   Retrieval: retrieved_chunks (Annotated[add_messages])
   Analysis:  drawing_analysis, violations, cost_estimation, schedule, risk_assessment
+  CrewAI:    analysis_result (text output from CrewAI crew execution)
   Review:    review_feedback
   Output:    final_answer
   Control:   messages, iteration, needs_human_approval, current_node, next_nodes
@@ -493,6 +494,10 @@ route_after_planner(state)  → [workflow/graph.py:45]
     "retrieval" → "retriever"
     "estimation" → "estimator"
     "compliance_check" → "compliance"
+    "complex_analysis" → "analysis_crew" (CrewAI delegation)
+    "drawing_analysis" → "drawing_analyzer"
+    "scheduling" → "scheduler"
+    "risk_analysis" → "risk_analyzer"
   → picks first node from list
 
 route_after_review(state)  → [workflow/graph.py:61]
@@ -540,14 +545,31 @@ Pattern: CrewAI _run() → asyncio.run(project_tool.execute()) → str
 
 ```
 CivilMindCrew  → [agents/crew.py]
-  __init__(project_id, question, documents, tools)
+  __init__(project_id, question, retrieved_chunks, document_ids, tools)
     → AgentFactory.create_all() → 9 agents
-    → _create_tasks() → 9 tasks (one per agent)
+    → _create_tasks() → 8 tasks (retriever → report_writer)
 
-  run() → Crew.kickoff()
-    Process.hierarchical (planner delegates)
-    Memory enabled (long-term, short-term, entity)
-    Returns: final report from report_writer agent
+  run() → CrewResult
+    → Crew.kickoff() with Process.hierarchical
+    → Memory enabled (long-term, short-term, entity)
+    → Returns CrewResult(analysis, chunks, violations, cost_estimate, schedule, risks)
+
+CrewResult  → [agents/crew.py]
+  Structured result returned to LangGraph state machine
+  → analysis: str (full text output)
+  → violations, cost_estimate, schedule, risks: extracted data
+```
+
+### Hybrid Integration (LangGraph + CrewAI)
+
+```
+analysis_crew_node(state)  → [workflow/nodes.py:345]
+  Called when planner routes to "complex_analysis"
+  → Creates CivilMindCrew with LangGraph state context
+  → Runs CrewAI in thread pool (asyncio.to_thread)
+  → Returns partial state update with analysis_result + extracted data
+
+Flow: planner → route_after_planner → analysis_crew_node → CrewAI → reviewer
 ```
 
 ### Execution Flow
@@ -588,7 +610,61 @@ CivilMindCrew.run()
 
 ---
 
-## File inventory (Phases 1-6)
+## 9. Vision Processing (Phase 7)
+
+### OCR Engine
+
+```
+OCREngine  → [vision/ocr.py]
+  __init__(lang="en")
+    → lazy-load PaddleOCR
+
+  extract_text(image_path) → list[OCRResult]
+    → PaddleOCR.ocr(path, cls=True)
+    → returns: [OCRResult(text, confidence, bbox)]
+
+  extract_all_text(image_path) → str
+    → joins all OCRResult.text
+```
+
+### Floor Plan Analysis
+
+```
+FloorPlanAnalyzer  → [vision/floorplan.py]
+  __init__(model=settings.LLM_VISION_MODEL)
+
+  analyze(image_path) → DrawingAnalysis
+    → base64-encode image
+    → POST {base_url}/chat/completions with vision model
+    → prompt: extract rooms, walls, doors, windows, columns, beams
+    → returns DrawingAnalysis(drawing_type, rooms, walls, columns, beams, ...)
+
+  analyze_batch(image_paths) → list[DrawingAnalysis]
+    → asyncio.gather() for parallel analysis
+```
+
+### Table Extraction
+
+```
+TableExtractor  → [vision/tables.py]
+  __init__(vision_model=...)
+
+  extract_from_pdf(pdf_path) → list[ExtractedTable]
+    → pdfplumber.open(pdf_path) → page.extract_tables()
+    → classify_table(headers) → TableType.BOQ|SPEC|SCHEDULE|UNKNOWN
+    → returns list of ExtractedTable
+
+  extract_from_image(image_path) → list[ExtractedTable]
+    → vision LLM prompt: "Extract all tables as JSON"
+    → classify headers → returns list of ExtractedTable
+
+  to_boq_json(table) → {items: [...], total: float, currency: "INR"}
+    → converts BOQ table to structured JSON
+```
+
+---
+
+## File inventory (Phases 1-7)
 
 ### Phase 1 — Foundation
 
@@ -653,6 +729,15 @@ CivilMindCrew.run()
 | `civilmind/agents/tools.py` | 7 CrewAI tool wrappers bridging to project tools |
 | `civilmind/agents/crew.py` | `CivilMindCrew` — agent assembly and execution |
 | `civilmind/agents/__init__.py` | Public API exports |
+
+### Phase 7 — Vision
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/vision/ocr.py` | `OCREngine`, `OCRResult` — PaddleOCR wrapper |
+| `civilmind/vision/floorplan.py` | `FloorPlanAnalyzer`, `DrawingAnalysis` — vision LLM for floor plans |
+| `civilmind/vision/tables.py` | `TableExtractor`, `ExtractedTable`, `TableType` — table extraction from PDFs/images |
+| `civilmind/vision/__init__.py` | Public API exports |
 
 ---
 

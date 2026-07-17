@@ -108,6 +108,9 @@ class ProjectState(TypedDict):
     # Review
     review_feedback: ReviewFeedback | None
 
+    # CrewAI hybrid analysis result
+    analysis_result: str | None
+
     # Output
     final_answer: str | None
 
@@ -148,6 +151,7 @@ def create_initial_state(
         schedule=None,
         risk_assessment=None,
         review_feedback=None,
+        analysis_result=None,
         final_answer=None,
         messages=[],
         iteration=0,

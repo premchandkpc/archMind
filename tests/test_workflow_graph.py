@@ -44,6 +44,41 @@ class TestRouteAfterPlanner:
         result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
         assert result == "retriever"
 
+    def test_maps_complex_analysis_to_crew(self) -> None:
+        state = create_initial_state("p1", "q")
+        state["next_nodes"] = ["complex_analysis"]
+
+        result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
+        assert result == "analysis_crew"
+
+    def test_maps_drawing_analysis_to_analyzer(self) -> None:
+        state = create_initial_state("p1", "q")
+        state["next_nodes"] = ["drawing_analysis"]
+
+        result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
+        assert result == "drawing_analyzer"
+
+    def test_maps_compliance_check(self) -> None:
+        state = create_initial_state("p1", "q")
+        state["next_nodes"] = ["compliance_check"]
+
+        result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
+        assert result == "compliance"
+
+    def test_maps_scheduling(self) -> None:
+        state = create_initial_state("p1", "q")
+        state["next_nodes"] = ["scheduling"]
+
+        result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
+        assert result == "scheduler"
+
+    def test_maps_risk_analysis(self) -> None:
+        state = create_initial_state("p1", "q")
+        state["next_nodes"] = ["risk_analysis"]
+
+        result = asyncio.get_event_loop().run_until_complete(route_after_planner(state))
+        assert result == "risk_analyzer"
+
 
 class TestRouteAfterReview:
     def test_valid_goes_to_reporter(self) -> None:

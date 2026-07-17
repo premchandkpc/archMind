@@ -16,6 +16,7 @@ from langgraph.graph import END, StateGraph
 from civilmind.config import MAX_ITERATIONS
 from civilmind.workflow.nodes import (
     NODE_REGISTRY,
+    analysis_crew_node,
     compliance_node,
     drawing_analyzer_node,
     estimator_node,
@@ -39,6 +40,7 @@ NODE_MAP: dict[str, str] = {
     "estimation": "estimator",
     "scheduling": "scheduler",
     "risk_analysis": "risk_analyzer",
+    "complex_analysis": "analysis_crew",
 }
 
 
@@ -100,6 +102,7 @@ def build_graph(checkpointer: Any | None = None) -> Any:
     graph.add_node("estimator", estimator_node)
     graph.add_node("scheduler", scheduler_node)
     graph.add_node("risk_analyzer", risk_analyzer_node)
+    graph.add_node("analysis_crew", analysis_crew_node)
     graph.add_node("reviewer", reviewer_node)
     graph.add_node("reporter", reporter_node)
     graph.add_node("human_approval", human_approval_node)
@@ -118,6 +121,7 @@ def build_graph(checkpointer: Any | None = None) -> Any:
             "estimator": "estimator",
             "scheduler": "scheduler",
             "risk_analyzer": "risk_analyzer",
+            "analysis_crew": "analysis_crew",
             "reviewer": "reviewer",
         },
     )
@@ -129,6 +133,7 @@ def build_graph(checkpointer: Any | None = None) -> Any:
     graph.add_edge("estimator", "reviewer")
     graph.add_edge("scheduler", "reviewer")
     graph.add_edge("risk_analyzer", "reviewer")
+    graph.add_edge("analysis_crew", "reviewer")
 
     # Conditional edges from reviewer
     graph.add_conditional_edges(

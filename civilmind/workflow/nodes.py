@@ -2,10 +2,12 @@
 
 Each node: takes ProjectState, does work, returns partial state update.
 Nodes call LLMs, search documents, analyze drawings, check compliance.
+Complex multi-agent tasks delegate to CrewAI via analysis_crew_node.
 """
 
 from __future__ import annotations
 
+import asyncio
 import json
 from typing import Any
 
@@ -326,6 +328,49 @@ Provide a clear, professional report in markdown."""
     }
 
 
+async def analysis_crew_node(state: ProjectState) -> dict[str, Any]:
+    """Delegate complex analysis to CrewAI multi-agent system.
+
+    Called when planner determines task needs multiple agents collaborating.
+    Runs CrewAI crew in thread pool, returns structured results to state.
+
+    Args:
+        state: Current workflow state.
+
+    Returns:
+        Partial state update with analysis_result and extracted data.
+    """
+    from civilmind.agents.crew import CivilMindCrew
+
+    crew = CivilMindCrew(
+        project_id=state.get("project_id", ""),
+        question=state["question"],
+        retrieved_chunks=state.get("retrieved_chunks", []),
+        document_ids=state.get("document_ids", []),
+    )
+
+    result = await asyncio.to_thread(crew.run)
+
+    update: dict[str, Any] = {
+        "analysis_result": result.analysis,
+        "messages": [
+            {"role": "assistant", "content": "CrewAI analysis completed", "name": "analysis_crew"}
+        ],
+        "current_node": "analysis_crew",
+    }
+
+    if result.violations:
+        update["violations"] = result.violations
+    if result.cost_estimate:
+        update["cost_estimation"] = result.cost_estimate
+    if result.schedule:
+        update["schedule"] = result.schedule
+    if result.risks:
+        update["risk_assessment"] = result.risks
+
+    return update
+
+
 async def human_approval_node(state: ProjectState) -> dict[str, Any]:
     """Pause workflow for human approval.
 
@@ -352,6 +397,7 @@ NODE_REGISTRY: dict[str, Any] = {
     "estimator": estimator_node,
     "scheduler": scheduler_node,
     "risk_analyzer": risk_analyzer_node,
+    "analysis_crew": analysis_crew_node,
     "reviewer": reviewer_node,
     "reporter": reporter_node,
     "human_approval": human_approval_node,

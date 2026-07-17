@@ -5,10 +5,11 @@ from __future__ import annotations
 import json
 from dataclasses import dataclass
 from typing import Any
-from unittest.mock import AsyncMock
+from unittest.mock import AsyncMock, MagicMock, patch
 
 from civilmind.llm.client import LLMClient
 from civilmind.workflow.nodes import (
+    analysis_crew_node,
     compliance_node,
     drawing_analyzer_node,
     estimator_node,
@@ -257,3 +258,53 @@ class TestHumanApprovalNode:
 
         assert out["needs_human_approval"] is True
         assert out["current_node"] == "human_approval"
+
+
+class TestAnalysisCrewNode:
+    def test_delegates_to_crew(self) -> None:
+        from civilmind.agents.crew import CrewResult
+
+        mock_result = CrewResult(
+            analysis="Analysis completed",
+            violations=[{"rule": "IS 456", "severity": "critical"}],
+            cost_estimate={"total": 500000},
+        )
+
+        mock_crew = MagicMock()
+        mock_crew.run.return_value = mock_result
+
+        state = create_initial_state("p1", "Complex analysis question")
+        state["retrieved_chunks"] = [{"content": "chunk1"}]
+
+        with patch("civilmind.agents.crew.CivilMindCrew", return_value=mock_crew):
+            import asyncio
+
+            out = asyncio.get_event_loop().run_until_complete(analysis_crew_node(state))
+
+        assert out["analysis_result"] == "Analysis completed"
+        assert out["current_node"] == "analysis_crew"
+        assert len(out["violations"]) == 1
+        assert out["cost_estimation"]["total"] == 500000
+        assert out["messages"][0]["name"] == "analysis_crew"
+
+    def test_crew_result_with_schedule(self) -> None:
+        from civilmind.agents.crew import CrewResult
+
+        mock_result = CrewResult(
+            analysis="Schedule analysis",
+            schedule={"duration_days": 90, "critical_path": ["Foundation"]},
+            risks={"risks": [{"name": "Weather"}], "overall_risk": "medium"},
+        )
+
+        mock_crew = MagicMock()
+        mock_crew.run.return_value = mock_result
+
+        state = create_initial_state("p1", "Schedule analysis")
+
+        with patch("civilmind.agents.crew.CivilMindCrew", return_value=mock_crew):
+            import asyncio
+
+            out = asyncio.get_event_loop().run_until_complete(analysis_crew_node(state))
+
+        assert out["schedule"]["duration_days"] == 90
+        assert out["risk_assessment"]["overall_risk"] == "medium"

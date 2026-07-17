@@ -155,20 +155,20 @@ class TestCivilMindCrew:
         assert crew.project_id == "test-1"
         assert "M25" in crew.question
         assert len(crew.get_agents()) == 9
-        assert len(crew.get_tasks()) == 9
+        assert len(crew.get_tasks()) == 8
 
-    def test_crew_with_documents(self) -> None:
-        docs = [
-            {"filename": "spec.pdf", "id": "doc1"},
-            {"filename": "drawing.dwg", "id": "doc2"},
+    def test_crew_with_chunks(self) -> None:
+        chunks = [
+            {"content": "concrete M25 spec", "score": 0.9},
+            {"content": "steel reinforcement", "score": 0.8},
         ]
         crew = CivilMindCrew(
             project_id="test-2",
             question="Analyze this building",
-            documents=docs,
+            retrieved_chunks=chunks,
         )
 
-        assert len(crew.documents) == 2
+        assert len(crew.retrieved_chunks) == 2
 
     def test_crew_task_order(self) -> None:
         crew = CivilMindCrew(
@@ -177,7 +177,7 @@ class TestCivilMindCrew:
         )
 
         tasks = crew.get_tasks()
-        # First task should be planner
-        assert tasks[0].agent.role == "Project Planner"
+        # First task should be retriever (not planner)
+        assert tasks[0].agent.role == "Document Specialist"
         # Last task should be report writer
         assert tasks[-1].agent.role == "Technical Writer"

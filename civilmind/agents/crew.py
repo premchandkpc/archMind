@@ -1,7 +1,7 @@
-"""Crew orchestration — assembles agents into a collaborative Crew.
+"""Crew orchestration — CrewAI agents called from LangGraph nodes.
 
-CivilMindCrew manages the lifecycle of a multi-agent construction analysis.
-Hierarchical process: Planner delegates to specialists.
+CivilMindCrew accepts LangGraph state, runs multi-agent analysis,
+and returns structured results back to the state machine.
 """
 
 from __future__ import annotations
@@ -16,30 +16,55 @@ from civilmind.agents.roles import AgentFactory
 logger = structlog.get_logger()
 
 
-class CivilMindCrew:
-    """Orchestrates multiple AI agents for construction analysis.
+class CrewResult:
+    """Structured result from CrewAI execution back to LangGraph."""
 
-    Creates agents, defines tasks, and executes the crew.
+    def __init__(
+        self,
+        analysis: str,
+        chunks: list[dict[str, Any]] | None = None,
+        violations: list[dict[str, Any]] | None = None,
+        cost_estimate: dict[str, Any] | None = None,
+        schedule: dict[str, Any] | None = None,
+        risks: dict[str, Any] | None = None,
+    ) -> None:
+        self.analysis = analysis
+        self.chunks = chunks or []
+        self.violations = violations or []
+        self.cost_estimate = cost_estimate
+        self.schedule = schedule
+        self.risks = risks
+
+    def to_dict(self) -> dict[str, Any]:
+        return {
+            "analysis": self.analysis,
+            "chunks": self.chunks,
+            "violations": self.violations,
+            "cost_estimate": self.cost_estimate,
+            "schedule": self.schedule,
+            "risks": self.risks,
+        }
+
+
+class CivilMindCrew:
+    """Orchestrates CrewAI agents for complex multi-agent analysis.
+
+    Called from LangGraph analysis_crew_node when a task needs
+    multiple agents collaborating (retriever + drawing + compliance + estimator).
     """
 
     def __init__(
         self,
         project_id: str,
         question: str,
-        documents: list[dict[str, str]] | None = None,
+        retrieved_chunks: list[dict[str, Any]] | None = None,
+        document_ids: list[str] | None = None,
         tools: dict[str, Any] | None = None,
     ) -> None:
-        """Initialize crew with project context.
-
-        Args:
-            project_id: Project identifier.
-            question: User's construction question.
-            documents: List of document metadata dicts.
-            tools: Dict mapping tool names to CrewAI tool instances.
-        """
         self.project_id = project_id
         self.question = question
-        self.documents = documents or []
+        self.retrieved_chunks = retrieved_chunks or []
+        self.document_ids = document_ids or []
         self._tools = tools or {}
 
         self._factory = AgentFactory(tools=self._tools)
@@ -47,32 +72,21 @@ class CivilMindCrew:
         self._tasks = self._create_tasks()
 
     def _create_tasks(self) -> list[Task]:
-        """Create tasks for each agent.
-
-        Returns:
-            List of Task objects defining agent work.
-        """
-        doc_summary = "\n".join(f"- {d.get('filename', 'unknown')}" for d in self.documents[:10])
+        """Create tasks with LangGraph state context injected."""
+        context_chunks = "\n".join(
+            f"- {c.get('content', '')[:200]}" for c in self.retrieved_chunks[:5]
+        )
 
         tasks = [
             Task(
                 description=(
-                    f"Analyze this construction question and create a plan:\n\n"
-                    f"Question: {self.question}\n"
-                    f"Available documents:\n{doc_summary}\n\n"
-                    f"Identify which specialists are needed and what each should do."
-                ),
-                agent=self._agents["planner"],
-                expected_output="JSON with tasks and required specialists",
-            ),
-            Task(
-                description=(
                     f"Search project documents for information relevant to:\n\n"
-                    f"Question: {self.question}\n\n"
-                    f"Find all related specs, codes, and reference materials."
+                    f"Question: {self.question}\n"
+                    f"Already retrieved context:\n{context_chunks}\n\n"
+                    f"Find any additional relevant information."
                 ),
                 agent=self._agents["retriever"],
-                expected_output="List of relevant document chunks with sources",
+                expected_output="Additional relevant document chunks",
             ),
             Task(
                 description=(
@@ -122,11 +136,8 @@ class CivilMindCrew:
             Task(
                 description=(
                     "Review all analysis outputs for quality and accuracy.\n\n"
-                    "Check for:\n"
-                    "- Calculation errors\n"
-                    "- Missing information\n"
-                    "- Contradictions between analyses\n"
-                    "- Code violations missed"
+                    "Check for calculation errors, missing information, "
+                    "contradictions, and missed code violations."
                 ),
                 agent=self._agents["reviewer"],
                 expected_output="Quality review with pass/fail and issues",
@@ -148,14 +159,13 @@ class CivilMindCrew:
             project_id=self.project_id,
             task_count=len(tasks),
         )
-
         return tasks
 
-    def run(self) -> str:
-        """Execute the crew and return the final report.
+    def run(self) -> CrewResult:
+        """Execute crew and return structured result for LangGraph.
 
         Returns:
-            Final report content from the report writer agent.
+            CrewResult with analysis text and structured data.
         """
         crew = Crew(
             agents=list(self._agents.values()),
@@ -172,27 +182,18 @@ class CivilMindCrew:
         )
 
         result = crew.kickoff()
+        result_str = str(result)
 
         logger.info(
             "Crew execution completed",
             project_id=self.project_id,
-            result_length=len(str(result)),
+            result_length=len(result_str),
         )
 
-        return str(result)
+        return CrewResult(analysis=result_str)
 
     def get_agents(self) -> dict[str, Any]:
-        """Get all agents.
-
-        Returns:
-            Dict mapping agent names to Agent instances.
-        """
         return self._agents.copy()
 
     def get_tasks(self) -> list[Task]:
-        """Get all tasks.
-
-        Returns:
-            List of Task objects.
-        """
         return self._tasks.copy()

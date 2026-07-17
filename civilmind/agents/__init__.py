@@ -1,9 +1,10 @@
 """Agents — specialized AI agents for construction analysis.
 
-Provides AgentFactory for creating agents and CivilMindCrew for orchestration.
+Provides AgentFactory for creating agents, CivilMindCrew for orchestration,
+and CrewResult for passing results back to LangGraph.
 """
 
-from civilmind.agents.crew import CivilMindCrew
+from civilmind.agents.crew import CivilMindCrew, CrewResult
 from civilmind.agents.roles import AgentFactory
 from civilmind.agents.tools import (
     CalculatorTool,
@@ -18,6 +19,7 @@ from civilmind.agents.tools import (
 __all__ = [
     "AgentFactory",
     "CivilMindCrew",
+    "CrewResult",
     "VectorSearchTool",
     "SQLQueryTool",
     "CalculatorTool",
