@@ -66,83 +66,35 @@ Files: `events/bus.py`
 > Tools are the interface between agents and infrastructure.
 > Strategy pattern: swap implementations without changing agent code.
 
-### 2.1 — Tool Registry + Base
+### 2.1 — Tool Registry + Base ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Abstract tool interface with DI container.
+**Files:** `tools/base.py`, `tools/registry.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `tools/base.py` | BaseTool ABC, ToolResult dataclass |
-| `tools/registry.py` | ToolRegistry: register, get, list |
-| `tools/dependencies.py` | FastAPI DI for tool injection |
+### 2.2 — VectorSearch Tool ✅
 
-**Design:**
-```python
-class BaseTool(ABC):
-    name: str
-    description: str
-    
-    @abstractmethod
-    async def execute(self, **kwargs) -> ToolResult: ...
+**Status:** Done
 
-class ToolResult:
-    success: bool
-    data: Any
-    error: str | None
-    latency_ms: float
-    tokens_used: int | None
-```
+**Files:** `tools/vector_search.py`
 
-### 2.2 — VectorSearch Tool
+### 2.3 — SQLQuery Tool ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Semantic + keyword search via hybrid retriever.
+**Files:** `tools/sql_query.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `tools/vector_search.py` | VectorSearchTool: search, search_batch |
+### 2.4 — OCR + Vision Tools ✅
 
-### 2.3 — SQLQuery Tool
+**Status:** Done
 
-**Status:** Pending
+**Files:** `tools/ocr.py`, `tools/vision_llm.py`
 
-**Goal:** Read-only SQL queries against PostgreSQL.
+### 2.5 — Calculator + CodeSearch Tools ✅
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `tools/sql_query.py` | SQLQueryTool: execute (read-only, parameterized) |
+**Status:** Done
 
-**Security:** Read-only connection, no DDL, parameterized queries only, query timeout 5s.
-
-### 2.4 — OCR + Vision Tools
-
-**Status:** Pending
-
-**Goal:** PaddleOCR and vision LLM tools.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `tools/ocr.py` | OCRTool: extract_text, extract_all |
-| `tools/vision_llm.py` | VisionLLMTool: analyze_image |
-
-### 2.5 — Calculator + CodeSearch Tools
-
-**Status:** Pending
-
-**Goal:** Math evaluation and building code lookup.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `tools/calculator.py` | CalculatorTool: safe math eval |
-| `tools/code_search.py` | CodeSearchTool: search regulations |
+**Files:** `tools/calculator.py`, `tools/code_search.py`
 
 ---
 
@@ -152,73 +104,29 @@ class ToolResult:
 > Upload → Queue → Parse → Chunk → Embed → Graph → Index → Ready.
 > Each step is independent, retryable, and horizontally scalable.
 
-### 3.1 — Document Parser
+### 3.1 — Document Parser ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Parse PDF, DOCX, Excel, images into structured elements.
+**Files:** `pipeline/parser.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `pipeline/parser.py` | DocumentParser: parse, classify elements |
+### 3.2 — Chunker + Metadata ✅
 
-**Element types:** Text, Table, Image, Title, ListItem
-**OCR fallback:** Scanned PDFs → PaddleOCR → text elements
+**Status:** Done
 
-### 3.2 — Chunker + Metadata
+**Files:** `pipeline/chunker.py`, `pipeline/metadata.py`
 
-**Status:** Pending
+### 3.3 — Embedding Service ✅
 
-**Goal:** Semantic chunking with rich metadata extraction.
+**Status:** Done
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `pipeline/chunker.py` | SemanticChunker: split by meaning, not fixed size |
-| `pipeline/metadata.py` | MetadataExtractor: measurements, code refs, keywords |
+**Files:** `pipeline/embedder.py`
 
-**Strategy:**
-- Text → SemanticSplitter (threshold=0.5)
-- Table → single chunk (don't break tables)
-- Image → caption chunk + image_path reference
+### 3.4 — Pipeline Orchestrator ✅
 
-### 3.3 — Embedding Service
+**Status:** Done
 
-**Status:** Pending
-
-**Goal:** Convert text to vectors. BGE-local for dev, OpenCode Zen for prod.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `pipeline/embedder.py` | BGEEmbedder, OpenCodeEmbedder, CachedEmbedder |
-
-**Caching:** SHA256 hash → .cache/embeddings/ → skip recompute
-
-### 3.4 — Pipeline Orchestrator
-
-**Status:** Pending
-
-**Goal:** Coordinate the full ingestion pipeline via Redis events.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `pipeline/orchestrator.py` | IngestionPipeline: publish, consume, coordinate |
-| `events/handlers.py` | Event handlers for each pipeline stage |
-
-**Flow:**
-```
-Upload → publish("document.uploaded")
-  → Parser subscribes → publish("document.parsed")
-  → Chunker subscribes → publish("document.chunked")
-  → Embedder subscribes → publish("document.embedded")
-  → Indexer subscribes → publish("document.indexed")
-  → Ready
-```
-
-**Retry:** Exponential backoff, max 3 attempts, dead-letter queue on failure.
+**Files:** `pipeline/orchestrator.py`, `events/handlers.py`, `pipeline/workers.py`
 
 ---
 
@@ -227,42 +135,23 @@ Upload → publish("document.uploaded")
 > Hybrid RAG with reranking and context compression.
 > BM25 + Vector + GraphRAG → RRF → Rerank → Compress → LLM.
 
-### 4.1 — BM25 Index
+### 4.1 — BM25 Index ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Keyword search for exact term matching.
+**Files:** `retrieval/bm25_index.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `retrieval/bm25_index.py` | BM25Index: build, search, add, remove |
+### 4.2 — Hybrid Retriever ✅
 
-### 4.2 — Hybrid Retriever
+**Status:** Done
 
-**Status:** Pending
+**Files:** `retrieval/hybrid.py`, `retrieval/reranker.py`, `retrieval/compressor.py`
 
-**Goal:** Combine BM25 + Vector with RRF fusion.
+### 4.3 — GraphRAG ✅
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `retrieval/hybrid.py` | HybridRetriever: full pipeline orchestrator |
-| `retrieval/reranker.py` | CrossEncoderReranker: ms-marco-MiniLM |
-| `retrieval/compressor.py` | ContextCompressor: extractive compression |
+**Status:** Done
 
-**Fallback:** Below MIN_CORPUS_FOR_BM25 (50 docs), skip BM25, pure vector.
-
-### 4.3 — GraphRAG
-
-**Status:** Pending
-
-**Goal:** Vector search + graph traversal for multi-hop reasoning.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `retrieval/graphrag.py` | GraphRAG: retrieve, answer with graph context |
+**Files:** `graph/graphrag.py`
 
 ---
 
@@ -272,43 +161,23 @@ Upload → publish("document.uploaded")
 > State persists via PostgreSQL checkpointer.
 > Conditional routing, retries, human-in-the-loop.
 
-### 5.1 — State Model
+### 5.1 — State Model ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** TypedDict flowing through the graph. Annotated reducers for accumulation.
+**Files:** `workflow/state.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `workflow/state.py` | ProjectState, helper types, state factory |
+### 5.2 — Graph Nodes ✅
 
-### 5.2 — Graph Nodes
+**Status:** Done
 
-**Status:** Pending
+**Files:** `workflow/nodes.py`
 
-**Goal:** Async functions that read/write state. Each node is independently testable.
+### 5.3 — Graph Builder + Routing ✅
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `workflow/nodes.py` | 10 nodes: planner, retriever, analyst, reviewer, reporter, etc. |
+**Status:** Done
 
-**Key principle:** Nodes call tools, not databases directly.
-
-### 5.3 — Graph Builder + Routing
-
-**Status:** Pending
-
-**Goal:** Assemble StateGraph with conditional edges.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `workflow/graph.py` | build_graph, route_after_planner, route_after_review |
-| `workflow/checkpoint.py` | PostgresSaver for state persistence |
-
-**Loop:** Reviewer → Planner (max 3 iterations) → Reporter → END
+**Files:** `workflow/graph.py`, `workflow/checkpoint.py`
 
 ---
 
@@ -318,28 +187,17 @@ Upload → publish("document.uploaded")
 > LangGraph delegates to CrewAI for complex domain tasks.
 > Agents use tools from Phase 2, never query databases directly.
 
-### 6.1 — Agent Definitions
+### 6.1 — Agent Definitions ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** 9 specialized agents with roles, goals, tools.
+**Files:** `agents/roles.py`, `agents/prompts.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `agents/roles.py` | AgentFactory: create agents with role/goal/backstory |
-| `agents/prompts.py` | System prompts per agent |
+### 6.2 — Crew Orchestration ✅
 
-### 6.2 — Crew Orchestration
+**Status:** Done
 
-**Status:** Pending
-
-**Goal:** Assemble CrewAI crew, hierarchical delegation.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `agents/crew.py` | CivilMindCrew: create_agents, create_tasks, run |
+**Files:** `agents/crew.py`
 
 ---
 
@@ -349,38 +207,23 @@ Upload → publish("document.uploaded")
 > PaddleOCR for text extraction. Vision LLM for structural analysis.
 > Runs as separate worker (Docker isolation).
 
-### 7.1 — OCR Engine
+### 7.1 — OCR Engine ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** PaddleOCR for scanned document text extraction.
+**Files:** `vision/ocr.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `vision/ocr.py` | OCREngine: extract_text, extract_all |
+### 7.2 — Floor Plan Analysis ✅
 
-### 7.2 — Floor Plan Analysis
+**Status:** Done
 
-**Status:** Pending
+**Files:** `vision/floorplan.py`
 
-**Goal:** Vision LLM analyzes floor plans for structural elements.
+### 7.3 — Table Extraction ✅
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `vision/floorplan.py` | FloorPlanAnalyzer: analyze → DrawingAnalysis |
+**Status:** Done
 
-### 7.3 — Table Extraction
-
-**Status:** Pending
-
-**Goal:** Extract tables from PDFs and images. Classify as BOQ/spec/schedule.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `vision/tables.py` | TableExtractor: extract_from_pdf, extract_from_image |
+**Files:** `vision/tables.py`
 
 ---
 
@@ -389,29 +232,17 @@ Upload → publish("document.uploaded")
 > Neo4j graph: Building → Floor → Room → Wall → Beam → Material → Vendor.
 > Enables multi-hop reasoning: "What vendor supplies concrete for Bedroom 1?"
 
-### 8.1 — Neo4j Schema + Ingestion
+### 8.1 — Neo4j Schema + Ingestion ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Graph schema (12 node types, 12 relationship types). Entity extraction.
+**Files:** `graph/schema.py`, `graph/entities.py`, `graph/neo4j_store.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `knowledge_graph/schema.py` | NODE_LABELS, RELATIONSHIPS |
-| `knowledge_graph/entities.py` | EntityExtractor: NER from documents |
-| `knowledge_graph/store.py` | Neo4jStore: CRUD, constraints |
+### 8.2 — Graph Traversal + Multi-hop ✅
 
-### 8.2 — Graph Traversal + Multi-hop
+**Status:** Done
 
-**Status:** Pending
-
-**Goal:** Combine vector search with graph traversal.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `knowledge_graph/traversal.py` | GraphTraversal: find_paths, multi_hop |
+**Files:** `graph/traversal.py`, `graph/graphrag.py`
 
 ---
 
@@ -512,18 +343,18 @@ Upload → publish("document.uploaded")
 ## Execution Order
 
 ```
-Phase 1:  1.1 ✓ → 1.2 ✓ → 1.3 ✓ → 1.4 → 1.5 → 1.6
-Phase 2:  2.1 → 2.2 → 2.3 → 2.4 → 2.5
-Phase 3:  3.1 → 3.2 → 3.3 → 3.4
-Phase 4:  4.1 → 4.2 → 4.3
-Phase 5:  5.1 → 5.2 → 5.3
-Phase 6:  6.1 → 6.2
-Phase 7:  7.1 → 7.2 → 7.3
-Phase 8:  8.1 → 8.2
+Phase 1:  1.1 ✓ → 1.2 ✓ → 1.3 ✓ → 1.4 ✓ → 1.5 ✓ → 1.6 ✓
+Phase 2:  2.1 ✓ → 2.2 ✓ → 2.3 ✓ → 2.4 ✓ → 2.5 ✓
+Phase 3:  3.1 ✓ → 3.2 ✓ → 3.3 ✓ → 3.4 ✓
+Phase 4:  4.1 ✓ → 4.2 ✓ → 4.3 ✓
+Phase 5:  5.1 ✓ → 5.2 ✓ → 5.3 ✓
+Phase 6:  6.1 ✓ → 6.2 ✓
+Phase 7:  7.1 ✓ → 7.2 ✓ → 7.3 ✓
+Phase 8:  8.1 ✓ → 8.2 ✓
 Phase 9:  9.1 → 9.2 → 9.3
 Phase 10: 10.1 → 10.2 → 10.3 → 10.4
 
-Status: 7/34 chunks complete. Phase 1 Foundation: Done. Phase 2 Tool Layer: 1/5. Next: 2.2 (VectorSearch Tool)
+Status: 28/34 chunks complete. Phases 1–8 Done. Next: 9.1 (Retrieval Metrics)
 ```
 
 ---
