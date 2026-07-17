@@ -1,4 +1,4 @@
-# Architecture Flows — Phases 1–7
+# Architecture Flows — Phases 1–9
 
 ## Diagram legend
 
@@ -664,7 +664,299 @@ TableExtractor  → [vision/tables.py]
 
 ---
 
-## File inventory (Phases 1-7)
+## 10. Knowledge Graph (Phase 8)
+
+### Graph Schema
+
+```
+[civilmind/graph/schema.py]
+  12 Node Labels:
+    Project, Building, Floor, Room, Wall, Column,
+    Beam, Door, Window, Material, Vendor, BuildingCode
+
+  12 Relationship Types:
+    HAS_BUILDING, HAS_FLOOR, HAS_ROOM, HAS_WALL, HAS_COLUMN,
+    HAS_DOOR, HAS_WINDOW, SUPPORTS, USES_MATERIAL, SUPPLIED_BY,
+    FOLLOWS_CODE, REFERENCES
+
+  VALID_EDGES: 12 (label, rel_type, label) tuples
+    Project --HAS_BUILDING--> Building
+    Building --HAS_FLOOR--> Floor
+    Floor --HAS_ROOM--> Room
+    Room --HAS_WALL--> Wall
+    Wall --HAS_DOOR--> Door / Wall --HAS_WINDOW--> Window
+    Floor --HAS_COLUMN--> Column
+    Column --SUPPORTS--> Beam
+    Beam --USES_MATERIAL--> Material / Wall --USES_MATERIAL--> Material
+    Material --SUPPLIED_BY--> Vendor
+    Building --FOLLOWS_CODE--> BuildingCode
+
+  CONSTRAINT_QUERIES: CREATE CONSTRAINT IF NOT EXISTS FOR (n:Label) REQUIRE n.id IS UNIQUE
+
+  Dataclasses:
+    GraphEntity(label, properties)      — validates label in NODE_LABELS, requires "id"
+    GraphRelationship(from_id, to_id, rel_type, properties) — validates rel_type in RELATIONSHIP_TYPES
+```
+
+### Entity Extraction
+
+```
+EntityExtractor  → [civilmind/graph/entities.py:64]
+  extract_from_text(text, project_id, document_id) → ExtractionResult
+    → MATERIAL_PATTERNS regex scan:
+        \bM\d{1,3}\b → "Concrete" (grade=M25)
+        \bFe\s?\d{2,3}\b → "Steel" (grade=Fe500)
+        \bbrick\b, \bmortar\b, \btile\b, \bpipe\b, ...
+    → CODE_PATTERNS regex scan:
+        \bIS\s?\d{3,4}\b → "IS" (e.g., IS 456)
+        \bNBC\s?\d{0,4}\b → "NBC"
+        \bACI\s?\d[\d-]*\b → "ACI"
+    → Returns: list[ExtractedEntity(label, name, properties)]
+
+  extract_from_drawing_analysis(analysis, project_id, document_id) → ExtractionResult
+    → Takes DrawingAnalysis JSON from FloorPlanAnalyzer
+    → Creates entity hierarchy:
+        Project → Building → Floor → Room(s)
+                          → Column(s)
+                          → Beam(s)
+                          → Wall(s)
+                          → Door(s)
+                          → Window(s)
+    → Creates relationships:
+        HAS_BUILDING, HAS_FLOOR, HAS_ROOM, HAS_COLUMN, etc.
+    → Returns: ExtractionResult(entities, relationships)
+```
+
+### Neo4j Store
+
+```
+Neo4jStore  → [civilmind/graph/neo4j_store.py:23]
+  __init__(uri, user, password)
+    → lazy-load neo4j.AsyncGraphDatabase
+
+  create_constraints()
+    → runs CONSTRAINT_QUERIES (12 unique ID constraints)
+
+  create_entity(entity: GraphEntity) → str
+    → MERGE (n:Label {id: $id}) SET n += $props RETURN n.id
+    → idempotent: updates on conflict
+
+  create_relationship(rel: GraphRelationship) → None
+    → MATCH (a {id: $from_id}), (b {id: $to_id})
+    → MERGE (a)-[r:REL_TYPE]->(b) SET r += $props
+
+  create_entities_batch(entities, relationships) → int
+    → sequential MERGE for each entity + relationship
+    → returns entity count
+
+  traverse(start_id, relationship, max_depth, direction) → list[dict]
+    → MATCH path = (start {id: $id})-[r]->(end)
+    → WHERE type(r) = $rel_type AND length(path) <= $max_depth
+    → Returns end nodes with depth + rel_types
+
+  query(cypher, params) → list[dict]
+    → arbitrary Cypher execution
+
+  delete_project(project_id) → int
+    → MATCH (n {project_id: $id}) DETACH DELETE n
+    → returns count of deleted nodes
+
+  health_check() → bool
+    → driver.verify_connectivity()
+```
+
+### Graph Traversal
+
+```
+GraphTraversal  → [civilmind/graph/traversal.py:54]
+  __init__(store: Neo4jStore)
+
+  find_paths(start_label, start_name, project_id, max_depth) → TraversalResult
+    → finds start node by label + name
+    → traverses outward with empty relationship type (any edge)
+    → direction="both"
+    → returns GraphPath(nodes, relationships, length)
+
+  find_material_chain(room_name, project_id) → TraversalResult
+    → hardcoded Cypher: Room→Wall→Material→Vendor
+    → "What vendor supplies concrete for Bedroom 1?"
+    → returns 4-node path: Room --HAS_WALL--> Wall --USES_MATERIAL--> Material --SUPPLIED_BY--> Vendor
+
+  find_building_codes(entity_name, project_id) → TraversalResult
+    → Building --FOLLOWS_CODE--> BuildingCode
+    → "Which codes apply to this building?"
+
+  get_full_context(project_id, max_nodes) → TraversalResult
+    → MATCH (n {project_id: $id}) — all project entities
+    → MATCH (a {project_id})-[r]->(b {project_id}) — all project relationships
+    → returns full graph for context building
+
+  TraversalResult:
+    paths: list[GraphPath]        — discovered paths
+    entities: list[dict]           — reached entity nodes
+    relationships: list[dict]      — (from_id, rel_type, to_id) triples
+    .evidence → list[str]          — human-readable path summaries
+```
+
+### GraphRAG Pipeline
+
+```
+GraphRAG  → [civilmind/graph/graphrag.py:70]
+  __init__(neo4j, vector_store, embedder, llm)
+
+  retrieve(query, project_id, top_k) → GraphContext
+    Step 1: Vector search
+      → embedder.embed(query) → query_vector
+      → vector_store.search(collection, query_vector, filter=project_id, limit=top_k)
+      → context.vector_chunks = [{id, content, source, score}, ...]
+
+    Step 2: Entity hint extraction
+      → _extract_entity_hints(query, chunks) → list[(label, name)]
+      → regex: \bM\d{1,3}\b → ("Material", "M25")
+      → regex: \b(bedroom|kitchen|...)\b → ("Room", "Bedroom")
+      → regex: \b(IS|ACI)\s?\d+ → ("BuildingCode", "IS 456")
+
+    Step 3: Graph traversal per hint
+      → traversal.find_paths(label, name, project_id, max_depth=2)
+      → collect unique entities + relationships + evidence
+
+    Step 4: Merge into GraphContext
+      → context.vector_chunks + graph_entities + graph_relationships + evidence
+
+  answer(query, project_id) → str
+    → retrieve() → GraphContext
+    → context.to_prompt() → formatted prompt section
+    → LLM.chat(prompt) → answer string
+
+  GraphContext.to_prompt() → str
+    → "## Relevant Document Excerpts" (top 5 chunks, 500 chars each)
+    → "## Knowledge Graph Entities" (top 20 entities)
+    → "## Graph Relationships" (top 15 relationships as src --[type]--> tgt)
+    → "## Supporting Evidence" (path summaries)
+```
+
+### Workflow Checkpoint
+
+```
+PostgresSaver  → [civilmind/workflow/checkpoint.py:17]
+  __init__(dsn: str)
+
+  setup() → None
+    → CREATE TABLE workflow_checkpoints (
+        thread_id TEXT, checkpoint_id TEXT,
+        parent_checkpoint_id TEXT,
+        checkpoint JSONB, metadata JSONB,
+        created_at TIMESTAMPTZ DEFAULT NOW(),
+        PRIMARY KEY (thread_id, checkpoint_id)
+      )
+    → CREATE INDEX idx_checkpoints_thread ON (thread_id, created_at DESC)
+
+  save(thread_id, checkpoint_id, state, metadata, parent_checkpoint_id) → None
+    → INSERT ... ON CONFLICT DO UPDATE
+
+  load(thread_id, checkpoint_id) → dict | None
+    → if checkpoint_id: fetch specific
+    → else: ORDER BY created_at DESC LIMIT 1
+
+  list_checkpoints(thread_id, limit) → list[dict]
+    → returns summaries without full state
+
+  delete_thread(thread_id) → int
+    → DELETE ... RETURN count
+```
+
+---
+
+## 11. Evaluation (Phase 9)
+
+### Retrieval Metrics
+
+```
+RetrievalMetrics  → [civilmind/evaluation/metrics.py]
+  __init__(k=5)
+
+  evaluate(query_results) → RetrievalMetricResult
+    query_results: list[{retrieved_ids: list[str], relevant_ids: set[str]}]
+
+    Per-query metrics:
+      Recall@K    = |retrieved ∩ relevant| / |relevant|
+      Precision@K = |retrieved ∩ relevant| / K
+      MRR         = 1 / rank_of_first_relevant
+      NDCG@K      = DCG / IDCG  (DCG = Σ 1/log2(rank+2))
+      Hit Rate    = 1 if any relevant in top K, else 0
+
+    Aggregated: mean across all queries
+    Returns: RetrievalMetricResult(recall, precision, mrr, ndcg, hit_rate, total, k)
+```
+
+### Faithfulness Checker
+
+```
+FaithfulnessChecker  → [civilmind/evaluation/faithfulness.py]
+  __init__(llm: LLMClient, threshold=0.7)
+
+  evaluate(query, context, answer) → FaithfulnessResult
+    → LLM-as-judge prompt with system role "strict evaluation judge"
+    → Returns JSON: {faithfulness_score, relevance_score, completeness_score,
+                      overall_score, hallucinated_claims, missing_aspects, explanation}
+    → Parses markdown-fenced JSON responses
+    → .is_faithful = faithfulness_score >= threshold
+
+  batch_evaluate(evaluations) → list[FaithfulnessResult]
+    → Sequential evaluation of multiple (query, context, answer) triples
+```
+
+### Cost Tracker
+
+```
+CostTracker  → [civilmind/evaluation/cost_tracker.py]
+  __init__(cost_per_1m: dict | None)
+    → default rates: gpt-5 $2.50/M, gpt-4o-mini $0.15/M, claude-sonnet $3.00/M
+
+  record(query_id, model, input_tokens, output_tokens, ...) → QueryCost
+    → cost_usd = (total_tokens / 1M) * rate
+
+  record_from_llm_result(query_id, model, tokens_used, ...) → QueryCost
+    → convenience wrapper for LLMResult objects
+
+  Properties:
+    .total_cost   → sum of all costs
+    .total_tokens → sum of all tokens
+    .query_count  → number of records
+    .avg_latency_ms → mean latency
+
+  Aggregation:
+    .by_model()    → {model: {count, tokens, cost_usd}}
+    .by_operation() → {operation: {count, tokens, cost_usd}}
+    .summary()     → full cost report dict
+```
+
+### Benchmark Runner
+
+```
+BenchmarkRunner  → [civilmind/evaluation/benchmarks.py]
+  __init__(retriever, faithfulness_checker, retrieval_metrics, cost_tracker)
+
+  run(cases, project_id) → BenchmarkReport
+    For each BenchmarkCase:
+      → retriever.retrieve(query, project_id) → retrieved_ids
+      → RetrievalMetrics.evaluate([{retrieved_ids, relevant_ids}])
+      → FaithfulnessChecker.evaluate(query, context, answer) [if checker available]
+      → BenchmarkResult(query, retrieval_metrics, faithfulness, latency, passed)
+
+    Aggregated:
+      → BenchmarkReport(total, passed, failed, avg_retrieval, avg_faithfulness, cost)
+
+  load_cases(path) → list[BenchmarkCase]
+    → JSON format: [{query, relevant_ids, context, expected_answer, tags}]
+
+  save_report(report, path)
+    → Serializes BenchmarkReport to JSON
+```
+
+---
+
+## File inventory (Phases 1-9)
 
 ### Phase 1 — Foundation
 
@@ -720,6 +1012,7 @@ TableExtractor  → [vision/tables.py]
 | `civilmind/workflow/state.py` | `ProjectState`, `create_initial_state()`, 7 helper TypedDicts |
 | `civilmind/workflow/nodes.py` | 10 node functions, `NODE_REGISTRY`, `set_llm()` |
 | `civilmind/workflow/graph.py` | `build_graph()`, `route_after_planner()`, `route_after_review()` |
+| `civilmind/workflow/checkpoint.py` | `PostgresSaver` — save, load, list, delete workflow checkpoints |
 
 ### Phase 6 — Agents
 
@@ -739,6 +1032,27 @@ TableExtractor  → [vision/tables.py]
 | `civilmind/vision/tables.py` | `TableExtractor`, `ExtractedTable`, `TableType` — table extraction from PDFs/images |
 | `civilmind/vision/__init__.py` | Public API exports |
 
+### Phase 8 — Knowledge Graph
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/graph/__init__.py` | Public API exports for all graph modules |
+| `civilmind/graph/schema.py` | `NODE_LABELS`, `RELATIONSHIP_TYPES`, `VALID_EDGES`, `GraphEntity`, `GraphRelationship`, `CONSTRAINT_QUERIES` |
+| `civilmind/graph/entities.py` | `EntityExtractor`, `ExtractedEntity`, `ExtractionResult` |
+| `civilmind/graph/neo4j_store.py` | `Neo4jStore` — create, traverse, query, delete, health_check |
+| `civilmind/graph/traversal.py` | `GraphTraversal`, `TraversalResult`, `GraphPath` — multi-hop queries |
+| `civilmind/graph/graphrag.py` | `GraphRAG`, `GraphContext` — vector + graph → LLM answer |
+
+### Phase 9 — Evaluation
+
+| File | Key exports |
+|------|-------------|
+| `civilmind/evaluation/__init__.py` | Public API exports for all evaluation modules |
+| `civilmind/evaluation/metrics.py` | `RetrievalMetrics`, `RetrievalMetricResult` — Recall@K, Precision@K, MRR, NDCG |
+| `civilmind/evaluation/faithfulness.py` | `FaithfulnessChecker`, `FaithfulnessResult` — LLM-as-judge |
+| `civilmind/evaluation/cost_tracker.py` | `CostTracker`, `QueryCost` — token usage and cost tracking |
+| `civilmind/evaluation/benchmarks.py` | `BenchmarkRunner`, `BenchmarkCase`, `BenchmarkReport` — automated evaluation |
+
 ---
 
 ## Config -> File cross-reference
@@ -752,7 +1066,7 @@ SECRET_KEY                  → SECRET_KEY                            → (futur
 POSTGRES_*                  → DATABASE_URL (property)               → db/models.py
 QDRANT_HOST/PORT            → QDRANT_URL (property)                 → vector/qdrant_store.py
 MINIO_*                     → MINIO_ENDPOINT, etc.                  → storage/minio_client.py
-NEO4J_URI/USER/PASSWORD     → NEO4J_URI, etc.                      → (future Phase 8)
+NEO4J_URI/USER/PASSWORD     → NEO4J_URI, etc.                      → graph/neo4j_store.py
 REDIS_URL                   → REDIS_URL                             → events/bus.py
 LLM_PROVIDER/API_KEY/BASE_URL/MODEL → llm_chat/vision_config       → llm/client.py
 EMBEDDING_PROVIDER/MODEL    → EMBEDDING_PROVIDER, EMBEDDING_MODEL   → pipeline/embedder.py

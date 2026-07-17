@@ -251,39 +251,23 @@ Files: `events/bus.py`
 > An AI system without evaluation is untrustworthy.
 > Measure retrieval quality, generation faithfulness, latency, cost.
 
-### 9.1 — Retrieval Metrics
+### 9.1 — Retrieval Metrics ✅
 
-**Status:** Pending
+**Status:** Done
 
-**Goal:** Recall@K, Precision@K, MRR, NDCG.
+**Files:** `evaluation/metrics.py`
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `evaluation/metrics.py` | RetrievalMetrics: recall, precision, mrr, ndcg |
+### 9.2 — Generation Metrics ✅
 
-### 9.2 — Generation Metrics
+**Status:** Done
 
-**Status:** Pending
+**Files:** `evaluation/faithfulness.py`, `evaluation/cost_tracker.py`
 
-**Goal:** Faithfulness, hallucination detection, answer relevance.
+### 9.3 — Evaluation Pipeline ✅
 
-**Files:**
-| File | Purpose |
-|------|---------|
-| `evaluation/faithfulness.py` | FaithfulnessChecker: LLM-as-judge |
-| `evaluation/cost_tracker.py` | CostTracker: token counting, cost per query |
+**Status:** Done
 
-### 9.3 — Evaluation Pipeline
-
-**Status:** Pending
-
-**Goal:** Automated evaluation against benchmark datasets.
-
-**Files:**
-| File | Purpose |
-|------|---------|
-| `evaluation/benchmarks.py` | BenchmarkRunner: run eval, generate report |
+**Files:** `evaluation/benchmarks.py`
 
 ---
 
@@ -351,10 +335,10 @@ Phase 5:  5.1 ✓ → 5.2 ✓ → 5.3 ✓
 Phase 6:  6.1 ✓ → 6.2 ✓
 Phase 7:  7.1 ✓ → 7.2 ✓ → 7.3 ✓
 Phase 8:  8.1 ✓ → 8.2 ✓
-Phase 9:  9.1 → 9.2 → 9.3
+Phase 9:  9.1 ✓ → 9.2 ✓ → 9.3 ✓
 Phase 10: 10.1 → 10.2 → 10.3 → 10.4
 
-Status: 28/34 chunks complete. Phases 1–8 Done. Next: 9.1 (Retrieval Metrics)
+Status: 31/34 chunks complete. Phases 1–9 Done. Next: 10.1 (Project CRUD)
 ```
 
 ---
