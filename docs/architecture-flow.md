@@ -62,7 +62,7 @@ Saves to disk:
 }
 ```
 
-Response: `202 Accepted` with `{"document_id": ..., "status": "processing"}`
+Response: `202 Accepted` with `{"document_id": ..., "filename": ..., "file_type": ..., "file_size": ..., "storage_path": "uploads/{project_id}/docs/{doc_id}{ext}", "status": "processing"}`
 
 ### Worker picks up
 

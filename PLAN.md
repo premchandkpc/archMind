@@ -214,7 +214,6 @@ Upload → publish("document.uploaded")
   → Parser subscribes → publish("document.parsed")
   → Chunker subscribes → publish("document.chunked")
   → Embedder subscribes → publish("document.embedded")
-  → Graph Builder subscribes → publish("document.graph_built")
   → Indexer subscribes → publish("document.indexed")
   → Ready
 ```
