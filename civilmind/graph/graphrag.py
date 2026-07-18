@@ -116,12 +116,14 @@ class GraphRAG:
         )
 
         for r in vector_results:
-            context.vector_chunks.append({
-                "id": r.id,
-                "content": r.payload.get("content", ""),
-                "source": r.payload.get("document_id", "unknown"),
-                "score": r.score,
-            })
+            context.vector_chunks.append(
+                {
+                    "id": r.id,
+                    "content": r.payload.get("content", ""),
+                    "source": r.payload.get("document_id", "unknown"),
+                    "score": r.score,
+                }
+            )
 
         # Step 2: Extract entity hints from chunks and query
         entity_hints = self._extract_entity_hints(query, context.vector_chunks)
@@ -144,8 +146,11 @@ class GraphRAG:
             context.evidence.extend(traversal.evidence)
             context.graph_relationships.extend(
                 [
-                    {"from": r.get("from", ""), "type": r.get("rel_type", r.get("type", "")),
-                     "to": r.get("to", "")}
+                    {
+                        "from": r.get("from", ""),
+                        "type": r.get("rel_type", r.get("type", "")),
+                        "to": r.get("to", ""),
+                    }
                     for r in traversal.relationships
                 ]
             )

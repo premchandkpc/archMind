@@ -296,6 +296,4 @@ class EntityExtractor:
         extracted: list[ExtractedEntity],
     ) -> list[GraphEntity]:
         """Convert ExtractedEntity list to GraphEntity list for Neo4j."""
-        return [
-            GraphEntity(label=e.label, properties=e.properties) for e in extracted
-        ]
+        return [GraphEntity(label=e.label, properties=e.properties) for e in extracted]

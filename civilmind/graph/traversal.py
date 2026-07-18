@@ -44,7 +44,7 @@ class TraversalResult:
             if len(path.nodes) >= 2:
                 names = [n.get("name", n.get("id", "?")) for n in path.nodes]
                 rels = " → ".join(
-                    f"{names[i]} --{path.relationships[i]}--> {names[i+1]}"
+                    f"{names[i]} --{path.relationships[i]}--> {names[i + 1]}"
                     for i in range(min(len(path.relationships), len(names) - 1))
                 )
                 evidence.append(rels)
@@ -170,27 +170,37 @@ class GraphTraversal:
             wall = record.get("wall", {})
 
             result.entities.extend([mat, vendor, wall])
-            result.relationships.append({
-                "from": wall.get("id", ""),
-                "type": "USES_MATERIAL",
-                "to": mat.get("id", ""),
-            })
-            result.relationships.append({
-                "from": mat.get("id", ""),
-                "type": "SUPPLIED_BY",
-                "to": vendor.get("id", ""),
-            })
+            result.relationships.append(
+                {
+                    "from": wall.get("id", ""),
+                    "type": "USES_MATERIAL",
+                    "to": mat.get("id", ""),
+                }
+            )
+            result.relationships.append(
+                {
+                    "from": mat.get("id", ""),
+                    "type": "SUPPLIED_BY",
+                    "to": vendor.get("id", ""),
+                }
+            )
 
-            result.paths.append(GraphPath(
-                nodes=[
-                    {"id": record.get("room", {}).get("id", ""), "label": "Room"},
-                    {"id": wall.get("id", ""), "label": "Wall"},
-                    {"id": mat.get("id", ""), "name": mat.get("name", ""), "label": "Material"},
-                    {"id": vendor.get("id", ""), "name": vendor.get("name", ""), "label": "Vendor"},
-                ],
-                relationships=["HAS_WALL", "USES_MATERIAL", "SUPPLIED_BY"],
-                length=3,
-            ))
+            result.paths.append(
+                GraphPath(
+                    nodes=[
+                        {"id": record.get("room", {}).get("id", ""), "label": "Room"},
+                        {"id": wall.get("id", ""), "label": "Wall"},
+                        {"id": mat.get("id", ""), "name": mat.get("name", ""), "label": "Material"},
+                        {
+                            "id": vendor.get("id", ""),
+                            "name": vendor.get("name", ""),
+                            "label": "Vendor",
+                        },
+                    ],
+                    relationships=["HAS_WALL", "USES_MATERIAL", "SUPPLIED_BY"],
+                    length=3,
+                )
+            )
 
         logger.info(
             "Material chain found",
@@ -229,16 +239,20 @@ class GraphTraversal:
         for record in codes:
             code_node = record.get("code", {})
             result.entities.append(code_node)
-            result.paths.append(GraphPath(
-                nodes=[
-                    {"id": record.get("b", {}).get("id", ""), "label": "Building"},
-                    {"id": code_node.get("id", ""),
-                     "name": code_node.get("name", ""),
-                     "label": "BuildingCode"},
-                ],
-                relationships=["FOLLOWS_CODE"],
-                length=1,
-            ))
+            result.paths.append(
+                GraphPath(
+                    nodes=[
+                        {"id": record.get("b", {}).get("id", ""), "label": "Building"},
+                        {
+                            "id": code_node.get("id", ""),
+                            "name": code_node.get("name", ""),
+                            "label": "BuildingCode",
+                        },
+                    ],
+                    relationships=["FOLLOWS_CODE"],
+                    length=1,
+                )
+            )
 
         return result
 
@@ -262,9 +276,7 @@ class GraphTraversal:
         result = TraversalResult()
 
         nodes = await self._store.query(
-            "MATCH (n {project_id: $project_id}) "
-            "RETURN labels(n)[0] AS label, n "
-            "LIMIT $limit",
+            "MATCH (n {project_id: $project_id}) RETURN labels(n)[0] AS label, n LIMIT $limit",
             {"project_id": project_id, "limit": max_nodes},
         )
 

@@ -34,9 +34,7 @@ class Neo4jStore:
         if self._driver is None:
             from neo4j import AsyncGraphDatabase
 
-            self._driver = AsyncGraphDatabase.driver(
-                self._uri, auth=(self._user, self._password)
-            )
+            self._driver = AsyncGraphDatabase.driver(self._uri, auth=(self._user, self._password))
             logger.info("Neo4j driver created", uri=self._uri)
         return self._driver
 
@@ -62,11 +60,7 @@ class Neo4jStore:
         """
         driver = self._get_driver()
         async with driver.session() as session:
-            cypher = (
-                f"MERGE (n:{entity.label} {{id: $id}}) "
-                f"SET n += $props "
-                f"RETURN n.id AS id"
-            )
+            cypher = f"MERGE (n:{entity.label} {{id: $id}}) SET n += $props RETURN n.id AS id"
             result = await session.run(
                 cypher,
                 id=entity.properties["id"],
@@ -123,10 +117,7 @@ class Neo4jStore:
 
         async with driver.session() as session:
             for entity in entities:
-                cypher = (
-                    f"MERGE (n:{entity.label} {{id: $id}}) "
-                    f"SET n += $props"
-                )
+                cypher = f"MERGE (n:{entity.label} {{id: $id}}) SET n += $props"
                 await session.run(
                     cypher,
                     id=entity.properties["id"],
@@ -233,9 +224,7 @@ class Neo4jStore:
         driver = self._get_driver()
         async with driver.session() as session:
             result = await session.run(
-                "MATCH (n {project_id: $project_id}) "
-                "DETACH DELETE n "
-                "RETURN count(n) AS deleted",
+                "MATCH (n {project_id: $project_id}) DETACH DELETE n RETURN count(n) AS deleted",
                 project_id=project_id,
             )
             record = await result.single()

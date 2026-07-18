@@ -1,5 +1,9 @@
 # Architecture Flows — Phases 1–9
 
+> This document traces every data flow through the CivilMind AI platform,
+> from upload to query answer. Each section explains **what happens**, **why**
+> it happens, and **how** data transforms at each step.
+
 ## Diagram legend
 
 ```
@@ -12,6 +16,17 @@ Redis Stream:name   → Event bus stream
 ---
 
 ## 1. Startup
+
+The application boots through a FastAPI `lifespan` context manager. On startup,
+two critical services are created: the **EventBus** (Redis Streams connection) and
+the **PipelineWorker** (background consumer that processes uploaded documents).
+The worker runs as an asyncio task, polling Redis for events in an infinite loop.
+On shutdown, the worker is stopped gracefully and all service connections are closed.
+
+**Why Redis Streams?** Redis provides both the message queue (Streams) and caching
+layer in one service, avoiding the need for a separate message broker like RabbitMQ.
+Streams guarantee at-least-once delivery and support consumer groups for horizontal
+scaling of workers.
 
 ```
 [api/app.py]
@@ -31,6 +46,22 @@ Worker.run() loop:
 ---
 
 ## 2. Upload → Parse
+
+When a user uploads a document, the API immediately returns `202 Accepted` with a
+document ID and kicks off async processing. The upload endpoint validates the file
+type and size, saves it to disk under a UUID-based path (preventing collisions),
+then publishes a `document.uploaded` event to Redis. The background worker picks
+this up and routes it to the correct handler based on event type.
+
+**Why async?** Construction documents can be large (50+ page PDFs, high-res scans).
+Synchronous processing would block the API. The event-driven pattern decouples
+upload speed from processing speed and allows multiple workers to process in
+parallel.
+
+**Parser fallback chain:** Unstructured (fast, vector-friendly) is tried first.
+If it fails (corrupted PDF, unusual encoding), PaddleOCR is used as fallback —
+this is critical because construction drawings often contain scanned content that
+pure text extraction misses.
 
 ### Entry
 
@@ -141,6 +172,23 @@ ParsedElement(
 
 ## 3. Parse → Chunk
 
+The chunker transforms flat parsed elements into structured chunks optimized for
+vector search. Each chunk gets metadata (section headers, measurements, code
+references, keywords) that will be stored alongside the embedding vector.
+
+**Why chunk instead of embedding entire documents?** LLM context windows are finite.
+Retrieval works by finding the top-K most relevant chunks, not entire documents.
+Chunking at ~1000 characters with 200-character overlap balances relevance
+specificity against context preservation.
+
+**Section-aware splitting:** The chunker tracks `current_section` from TITLE
+elements, so every chunk knows which document section it belongs to. This enables
+filtered search later (e.g., "only search in foundation specifications").
+
+**Metadata extraction** is lightweight regex-based: it pulls out construction-specific
+patterns like concrete grades (M25, M30), code references (IS456, NBC 2016), and
+technical keywords — these become filterable facets in vector search.
+
 ```
 handle_document_parsed(event, chunker, bus)  → [events/handlers.py:66]
 
@@ -239,6 +287,23 @@ Chunk(
 
 ## 4. Chunk → Embed → Index
 
+Chunks are embedded into dense vectors (768 dimensions) using BGE-base-en-v1.5
+and stored in Qdrant, a purpose-built vector database. The embedding step is
+the bridge between human-readable text and machine-searchable vectors.
+
+**Why BGE-base?** It's the best open-source embedding model for technical
+construction content — it understands domain-specific terminology better than
+general-purpose models like OpenAI's text-embedding-ada-002, while being
+self-hosted (no external API calls).
+
+**CachedEmbedder** avoids re-embedding the same content: it computes SHA256 of
+the text and checks a local file cache first. This saves significant time during
+re-ingestion or when multiple documents reference the same specifications.
+
+**Qdrant payload** stores all metadata as filterable fields, enabling rich queries
+like "search only in project X, only in sections with code references, only tables."
+The payload is what makes vector search *contextual*, not just semantic.
+
 ```
 handle_document_chunked(event, embedder, store, bus)  → [events/handlers.py:106]
 
@@ -301,6 +366,18 @@ handle_document_embedded(event, bus)  → [events/handlers.py:156]
 ---
 
 ## 5. Query (existing Phase 2 tools)
+
+These are the foundational tools available to agents for querying data. Each tool
+is a self-contained unit that accesses a specific data source — agents never
+access databases or APIs directly, only through these tool interfaces.
+
+**Why tool abstraction?** It ensures agents are portable (swap Qdrant for Pinecone
+without changing agent code), testable (mock tools for unit tests), and auditable
+(every tool call is logged with latency and result).
+
+**Security:** SQLQueryTool rejects any write operations (INSERT/UPDATE/DELETE/DROP)
+— it's a read-only SQL gateway. CalculatorTool uses AST-level safe evaluation,
+not `eval()`, preventing code injection.
 
 ### Vector search
 
@@ -390,6 +467,20 @@ Tool: CodeSearchTool → [tools/code_search.py]
 
 ## 6. Hybrid Retrieval (Phase 4)
 
+Hybrid retrieval combines two search paradigms: **BM25** (keyword/statistical)
+and **vector** (semantic/dense). BM25 excels at finding exact term matches like
+"IS 456 Section 5.3" while vector search finds semantic similarity like "foundation
+concrete specifications." The hybrid approach merges both result sets with
+configurable weights, capturing results that either method alone would miss.
+
+**RRF fusion** (Reciprocal Rank Fusion) is used instead of raw score averaging
+because BM25 and vector scores are on different scales. RRF normalizes by rank
+position, making fusion robust regardless of individual score magnitudes.
+
+**Why not just vector search?** Construction documents are terminology-heavy. A
+query for "Fe500D rebar" needs exact keyword matching — vector search might return
+"Fe500" but miss the "D" variant. BM25 catches it.
+
 ### BM25 + Vector Search
 
 ```
@@ -422,6 +513,27 @@ HybridRetriever.retrieve(query, project_id)  → [retrieval/hybrid.py]
 ---
 
 ## 7. Workflow Graph (Phase 5)
+
+The workflow is a LangGraph `StateGraph` — a directed acyclic graph where each
+node is an async function that transforms `ProjectState`. The planner node
+analyzes the user's question and decides which downstream nodes to activate
+(retrieval, estimation, compliance, drawing analysis, etc.). After execution,
+a reviewer node checks quality and either approves (→ reporter) or sends back
+to the planner for iteration.
+
+**Why LangGraph instead of plain CrewAI?** LangGraph gives explicit control over
+which agents run and in what order. CrewAI is called *within* the
+`analysis_crew_node` for complex multi-agent tasks, but simple queries can skip
+the overhead. This hybrid approach gives the best of both: LangGraph's routing
+control + CrewAI's agent collaboration.
+
+**Checkpointing:** The graph state is persisted to Postgres via `PostgresSaver`,
+enabling workflow resumption after crashes. Each state transition is checkpointed,
+so a failed compliance check can be retried without re-running retrieval.
+
+**Review loop:** The planner→nodes→reviewer cycle can iterate up to `MAX_ITERATIONS`
+(3 by default). If the reviewer finds issues (missing data, calculation errors),
+the planner gets another chance with the feedback incorporated.
 
 ### LangGraph State Flow
 
@@ -509,6 +621,22 @@ route_after_review(state)  → [workflow/graph.py:61]
 ---
 
 ## 8. Agent Definitions (Phase 6)
+
+Agents are specialized AI personas with domain expertise. The `AgentFactory`
+creates 9 agents, each with a specific construction role (planner, estimator,
+compliance officer, etc.). Each agent gets a curated set of tools and a
+system prompt (backstory) that shapes its behavior.
+
+**Why CrewAI + LangGraph?** CrewAI handles multi-agent collaboration natively —
+agents can delegate to each other, share context, and run in hierarchical or
+sequential modes. But for simple queries (just retrieval + answer), CrewAI's
+overhead is unnecessary. The workflow graph routes simple tasks directly to
+LangGraph nodes and only invokes the full crew for complex multi-domain analysis.
+
+**Tool wrappers** bridge CrewAI's tool interface to the project's tool classes.
+CrewAI's `_run()` is synchronous, so wrappers use `asyncio.run()` to call the
+async tool methods. This is a pragmatic compromise — CrewAI doesn't support
+native async yet.
 
 ### CrewAI Agent Architecture
 
@@ -612,6 +740,26 @@ CivilMindCrew.run()
 
 ## 9. Vision Processing (Phase 7)
 
+Construction drawings are the most information-dense artifacts in a project —
+floor plans, structural details, MEP layouts. This phase extracts structured
+data from images using three approaches: **OCR** (text extraction), **Vision LLM**
+(semantic understanding), and **DrawingAnalysis** (combined pipeline).
+
+**Lazy-loaded PaddleOCR:** OCR models are large (~2GB). Loading them at startup
+would slow boot time. Instead, the engine loads on first use and caches in a
+module-level singleton. This is safe because construction projects typically
+process drawings in batches, not one-off.
+
+**DrawingAnalyzer** orchestrates a pipeline: extract text via OCR → send image +
+OCR results to Vision LLM for semantic analysis → merge into structured elements.
+This hybrid approach catches both explicit text (dimension labels) and implicit
+information (room functions, spatial relationships).
+
+**MinIO storage** keeps original images separately from the vector database.
+Qdrant stores vectors + metadata, MinIO stores the actual binary data. This
+separation is intentional: vector DBs are optimized for similarity search, not
+binary blob storage.
+
 ### OCR Engine
 
 ```
@@ -665,6 +813,24 @@ TableExtractor  → [vision/tables.py]
 ---
 
 ## 10. Knowledge Graph (Phase 8)
+
+The knowledge graph represents construction entities (buildings, rooms, materials,
+codes) as nodes and their relationships as edges in Neo4j. This enables traversals
+like "find all rooms using M25 concrete" or "which building codes apply to this
+floor" — queries that are difficult in vector search alone.
+
+**Why Neo4j?** Graph databases excel at multi-hop traversals. Finding "all rooms
+in building X that use materials from vendor Y" requires joining across 3+ hops —
+this is a natural graph query but requires multiple round-trips in SQL/vector DB.
+
+**Schema-first design:** The graph has 12 node types and 12 relationship types,
+all validated at the Python level via `VALID_EDGES`. This prevents invalid
+connections (e.g., a Window SUPPORTS a Column) and ensures the graph stays
+structurally sound as entities are added.
+
+**Regex-based NER** (not LLM-based) for entity extraction — it's faster, cheaper,
+and deterministic. LLM-based NER is an optional enhancement for entities that
+regex can't capture (e.g., identifying a "room" from natural language descriptions).
 
 ### Graph Schema
 
@@ -800,6 +966,21 @@ GraphTraversal  → [civilmind/graph/traversal.py:54]
 
 ### GraphRAG Pipeline
 
+GraphRAG combines vector search with graph traversal to answer queries that
+require both semantic similarity and relational reasoning. For example, "What
+concrete grade is used in the bedrooms?" needs vector search to find relevant
+chunks AND graph traversal to connect rooms → walls → materials.
+
+**How it works:** (1) Vector search finds relevant document chunks. (2) Entity
+hints are extracted from the query using regex (e.g., "M25" → Material entity).
+(3) For each hint, the graph is traversed to find connected entities. (4) All
+evidence is merged into a `GraphContext` and formatted as an LLM prompt.
+
+**Why not just vector search?** Construction queries often involve relationships:
+"Which vendors supply materials for this floor?" requires following
+Room→Wall→Material→Vendor paths. Vector search finds chunks about vendors and
+materials separately, but doesn't connect them.
+
 ```
 GraphRAG  → [civilmind/graph/graphrag.py:70]
   __init__(neo4j, vector_store, embedder, llm)
@@ -868,6 +1049,26 @@ PostgresSaver  → [civilmind/workflow/checkpoint.py:17]
 ---
 
 ## 11. Evaluation (Phase 9)
+
+The evaluation system measures three quality dimensions: **retrieval accuracy**
+(how well search results match ground truth), **answer faithfulness** (whether
+the LLM's answer is grounded in retrieved context), and **cost efficiency** (token
+usage and API costs across queries).
+
+**Why measure retrieval separately from faithfulness?** A system can retrieve
+perfect documents but generate hallucinated answers, or retrieve irrelevant
+documents but produce a plausible-sounding answer. Measuring both independently
+helps pinpoint where quality degrades.
+
+**LLM-as-judge for faithfulness:** The `FaithfulnessChecker` asks the LLM to
+evaluate whether each claim in the answer is supported by the context. This is
+more reliable than rule-based checks because construction answers require domain
+understanding (e.g., knowing that "M25" implies a specific compressive strength).
+
+**BenchmarkRunner** supports load testing: it runs the same queries against
+different configurations (e.g., different chunk sizes, embedding models) and
+saves JSON reports for comparison. This enables data-driven optimization of
+retrieval parameters.
 
 ### Retrieval Metrics
 
