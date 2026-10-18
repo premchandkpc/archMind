@@ -63,7 +63,11 @@ class NativeStore:
         with self._lock:
             self._ensure_usable()
             if chunk.vector is not None:
-                dimensions = {len(item.vector) for item in self._records.values() if item.vector is not None}
+                dimensions = {
+                    len(item.vector)
+                    for item_id, item in self._records.items()
+                    if item_id != chunk.id and item.vector is not None
+                }
                 if dimensions and len(chunk.vector) not in dimensions:
                     raise ValueError("vector dimension mismatch for this database")
             record = {
