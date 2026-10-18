@@ -12,6 +12,7 @@ import (
 	"path/filepath"
 	"reflect"
 	"sort"
+	"strings"
 	"sync"
 	"time"
 )
@@ -50,7 +51,6 @@ type walRecord struct {
 // locking and distributed replication are intentionally out of scope for v0.
 type Store struct {
 	mu       sync.RWMutex
-	dir      string
 	walPath  string
 	wal      *os.File
 	chunks   map[string]Chunk
@@ -70,7 +70,6 @@ func Open(dir string) (*Store, error) {
 		return nil, fmt.Errorf("create database directory: %w", err)
 	}
 	s := &Store{
-		dir:      dir,
 		walPath:  filepath.Join(dir, "civilmind.wal"),
 		chunks:   make(map[string]Chunk),
 		evidence: make(map[string]Evidence),
@@ -214,7 +213,8 @@ func (s *Store) Search(options SearchOptions) ([]Hit, error) {
 	if options.ProjectID == "" {
 		return nil, fmt.Errorf("%w: project_id is required", ErrInvalidInput)
 	}
-	if options.Query == "" && len(options.QueryVector) == 0 {
+	queryText := strings.TrimSpace(options.Query)
+	if queryText == "" && len(options.QueryVector) == 0 {
 		return nil, fmt.Errorf("%w: query or query_vector is required", ErrInvalidInput)
 	}
 	limit := options.Limit
@@ -256,8 +256,8 @@ func (s *Store) Search(options SearchOptions) ([]Hit, error) {
 		poolSize = 200
 	}
 	var lexical []lexicalHit
-	if options.Query != "" {
-		lexical = s.index.lexicalSearch(options.Query, allowed, poolSize)
+	if queryText != "" {
+		lexical = s.index.lexicalSearch(queryText, allowed, poolSize)
 	}
 	var vector []lexicalHit
 	var err error
@@ -581,7 +581,7 @@ func vectorNorm(vector []float64) float64 {
 	for _, value := range vector {
 		sum += value * value
 	}
-	return math.Sqrt(sum)
+	return math.Hypot(0, math.Sqrt(sum))
 }
 
 func cloneChunk(chunk Chunk) Chunk {
