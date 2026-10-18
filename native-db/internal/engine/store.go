@@ -459,7 +459,10 @@ func (s *Store) replay() error {
 		}
 		s.sequence = record.Sequence
 		expectedSequence++
-		validEnd, _ = wal.Seek(0, io.SeekCurrent)
+		validEnd, seekErr = wal.Seek(0, io.SeekCurrent)
+		if seekErr != nil {
+			return fmt.Errorf("read WAL offset after record: %w", seekErr)
+		}
 	}
 
 	info, err := wal.Stat()
@@ -570,18 +573,19 @@ func validateVector(vector []float64) error {
 			return fmt.Errorf("%w: vector values must be finite", ErrInvalidInput)
 		}
 	}
-	if vectorNorm(vector) == 0 {
-		return fmt.Errorf("%w: vector must not be zero", ErrInvalidInput)
+	norm := vectorNorm(vector)
+	if norm == 0 || math.IsInf(norm, 0) || math.IsNaN(norm) {
+		return fmt.Errorf("%w: vector norm must be finite and non-zero", ErrInvalidInput)
 	}
 	return nil
 }
 
 func vectorNorm(vector []float64) float64 {
-	sum := 0.0
+	norm := 0.0
 	for _, value := range vector {
-		sum += value * value
+		norm = math.Hypot(norm, value)
 	}
-	return math.Hypot(0, math.Sqrt(sum))
+	return norm
 }
 
 func cloneChunk(chunk Chunk) Chunk {
