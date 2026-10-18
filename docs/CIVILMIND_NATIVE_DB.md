@@ -13,7 +13,7 @@ inverted index and exact flat cosine index are derived in-memory indexes rebuilt
 - Chunk upsert/delete, metadata filtering, project scoping.
 - BM25-like lexical scoring, exact cosine similarity, reciprocal-rank-fusion results.
 - HTTP endpoints for ingest, delete, search, and stats.
-- Bearer-token authentication when `CIVILMIND_DB_TOKEN` is configured.
+- Bearer-token authentication; data endpoints fail closed until `CIVILMIND_DB_TOKEN` is configured.
 
 ## Run locally
 
@@ -23,7 +23,7 @@ CIVILMIND_DB_DATA_DIR=.data/civilmind-native CIVILMIND_DB_TOKEN=dev-token \
 ```
 
 The example binds to loopback. Set a strong token before exposing it to another machine.
-`/health` is intended for local health checks; data endpoints require a bearer token when configured.
+`/health` is intended for local health checks. Data endpoints return 503 until a token is configured, and then require that bearer token.
 
 ## API
 
