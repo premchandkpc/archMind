@@ -8,7 +8,7 @@
 .PHONY: docker-up docker-down docker-down-volumes docker-ps docker-logs docker-restart
 .PHONY: docker-postgres docker-qdrant docker-minio docker-neo4j docker-redis
 .PHONY: health check-all build build-docker
-.PHONY: setup quickstart env
+.PHONY: setup quickstart env native-db test-native-db
 
 # ---------- Config ----------
 PYTHON := .venv/bin/python
@@ -106,6 +106,12 @@ run-dev: ## Run API server (dev mode with auto-reload)
 
 run-worker: ## Run background worker (ingestion pipeline)
 	@echo "Worker not implemented yet (Phase 3.4)"
+
+native-db: ## Run standalone CivilMind Native DB on loopback port 8091
+	$(PYTHON) -m uvicorn civilmind.native_db.server:app --host 127.0.0.1 --port 8091
+
+test-native-db: ## Run Native DB unit and HTTP tests
+	$(PYTHON) -m pytest tests/native_db/ -v
 
 # ============================================================
 # DATABASE
