@@ -22,6 +22,12 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False)
     SECRET_KEY: str = Field(default="")
 
+    # ---------- Retrieval backend ----------
+    RETRIEVAL_BACKEND: Literal["qdrant", "native_db"] = Field(default="qdrant")
+    CIVILMIND_DB_URL: str = Field(default="http://127.0.0.1:8091")
+    CIVILMIND_DB_TOKEN: str = Field(default="")
+    CIVILMIND_DB_TIMEOUT_SECONDS: int = Field(default=10, ge=1, le=120)
+
     # ============================================================
     # PostgreSQL
     # ============================================================
