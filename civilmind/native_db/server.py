@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 import hmac
+from collections.abc import AsyncIterator
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -56,7 +57,7 @@ def create_app(
     expected_token = api_token if api_token is not None else settings.CIVILMIND_DB_TOKEN
 
     @asynccontextmanager
-    async def lifespan(app: FastAPI):
+    async def lifespan(app: FastAPI) -> AsyncIterator[None]:
         if native_store is None:
             app.state.native_store = NativeStore(
                 data_dir or settings.CIVILMIND_DB_DATA_DIR
