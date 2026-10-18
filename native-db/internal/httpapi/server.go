@@ -1,13 +1,13 @@
 package httpapi
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"errors"
 	"io"
 	"log/slog"
 	"net/http"
 	"strings"
-	"time"
 
 	"github.com/premchandkpc/archMind/native-db/internal/engine"
 )
@@ -203,19 +203,5 @@ func requestLimits(next http.Handler) http.Handler {
 }
 
 func constantTimeEqual(left, right string) bool {
-	// crypto/subtle's comparison has constant time for equal-length strings.
-	return subtleCompare([]byte(left), []byte(right))
+	return subtle.ConstantTimeCompare([]byte(left), []byte(right)) == 1
 }
-
-var subtleCompare = func(left, right []byte) bool {
-	if len(left) != len(right) {
-		return false
-	}
-	var diff byte
-	for i := range left {
-		diff |= left[i] ^ right[i]
-	}
-	return diff == 0
-}
-
-var _ = time.RFC3339Nano
