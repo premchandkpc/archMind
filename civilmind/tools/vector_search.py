@@ -13,6 +13,7 @@ import structlog
 from civilmind.config import VECTOR_TOP_K
 from civilmind.settings import settings
 from civilmind.tools.base import BaseTool, ToolResult
+from civilmind.vector.native_db_store import NativeDBClient
 from civilmind.vector.qdrant_store import QdrantStore
 
 logger = structlog.get_logger()
@@ -25,13 +26,23 @@ class VectorSearchTool(BaseTool):
     description = "Search project documents using semantic similarity"
     category = "retrieval"
 
-    def __init__(self, qdrant: QdrantStore | None = None) -> None:
-        self._qdrant = qdrant or QdrantStore(url=settings.QDRANT_URL)
+    def __init__(
+        self,
+        qdrant: QdrantStore | None = None,
+        native_db: NativeDBClient | None = None,
+    ) -> None:
+        self._native_db: NativeDBClient | None = None
+        self._qdrant: QdrantStore | None = None
+        if settings.RETRIEVAL_BACKEND == "native_db":
+            self._native_db = native_db or NativeDBClient()
+        else:
+            self._qdrant = qdrant or QdrantStore(url=settings.QDRANT_URL)
 
     async def execute(
         self,
         query_vector: list[float],
         project_id: str,
+        query: str = "",
         top_k: int = VECTOR_TOP_K,
         filter_dict: dict[str, str] | None = None,
         **kwargs: Any,
@@ -47,16 +58,28 @@ class VectorSearchTool(BaseTool):
         Returns:
             ToolResult with list of {id, score, payload} dicts.
         """
-        filters = filter_dict or {}
+        filters = dict(filter_dict or {})
         filters["project_id"] = project_id
 
         try:
-            results = await self._qdrant.search(
-                collection=settings.QDRANT_COLLECTION,
-                query_vector=query_vector,
-                filter_dict=filters,
-                limit=top_k,
-            )
+            if self._native_db is not None:
+                results = await self._native_db.search(
+                    query=query,
+                    query_vector=query_vector,
+                    project_id=project_id,
+                    filter_dict=filters,
+                    limit=top_k,
+                )
+                collection = "native-db"
+            else:
+                assert self._qdrant is not None
+                results = await self._qdrant.search(
+                    collection=settings.QDRANT_COLLECTION,
+                    query_vector=query_vector,
+                    filter_dict=filters,
+                    limit=top_k,
+                )
+                collection = settings.QDRANT_COLLECTION
 
             data = [{"id": r.id, "score": round(r.score, 4), "payload": r.payload} for r in results]
 
@@ -70,7 +93,7 @@ class VectorSearchTool(BaseTool):
             return ToolResult(
                 success=True,
                 data=data,
-                metadata={"collection": settings.QDRANT_COLLECTION, "top_k": top_k},
+                metadata={"collection": collection, "top_k": top_k},
             )
 
         except Exception as e:
@@ -85,5 +108,8 @@ class VectorSearchTool(BaseTool):
             )
 
     async def health_check(self) -> bool:
-        """Check if Qdrant is reachable."""
+        """Check the configured retrieval backend."""
+        if self._native_db is not None:
+            return await self._native_db.health_check()
+        assert self._qdrant is not None
         return await self._qdrant.health_check()
