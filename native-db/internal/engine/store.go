@@ -602,7 +602,20 @@ func cloneChunk(chunk Chunk) Chunk {
 func matchesMetadata(metadata, filters map[string]any) bool {
 	for key, expected := range filters {
 		actual, exists := metadata[key]
-		if !exists || !reflect.DeepEqual(actual, expected) {
+		if !exists {
+			return false
+		}
+		// Compare JSON-normalized values so int(2) and JSON's float64(2)
+		// behave identically, including nested objects and arrays.
+		raw, err := json.Marshal(expected)
+		if err != nil {
+			return false
+		}
+		var normalized any
+		if err := json.Unmarshal(raw, &normalized); err != nil {
+			return false
+		}
+		if !reflect.DeepEqual(actual, normalized) {
 			return false
 		}
 	}
