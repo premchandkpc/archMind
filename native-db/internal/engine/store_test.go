@@ -14,6 +14,19 @@ func testChunk(id, project, content string, vector []float64, metadata map[strin
 		RevisionID: "rev-1", Content: content, Vector: vector, Metadata: metadata}
 }
 
+func TestTokenizerPreservesEngineeringIdentifiersAndStripsPunctuation(t *testing.T) {
+	got := tokenize("IS:456 clause 5.3, M-20 and A/104.")
+	want := []string{"is:456", "clause", "5.3", "m-20", "and", "a/104"}
+	if len(got) != len(want) {
+		t.Fatalf("tokenize() = %#v; want %#v", got, want)
+	}
+	for i := range want {
+		if got[i] != want[i] {
+			t.Fatalf("tokenize() = %#v; want %#v", got, want)
+		}
+	}
+}
+
 func TestWALReplayUpsertDeleteAndEvidence(t *testing.T) {
 	dir := t.TempDir()
 	store, err := Open(dir)
