@@ -90,6 +90,53 @@ func TestHybridSearchHonorsProjectAndMetadataFilters(t *testing.T) {
 	}
 }
 
+func TestBatchUpsertIsAtomicAndReplays(t *testing.T) {
+	dir := t.TempDir()
+	store, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	sequence, err := store.UpsertChunks([]Chunk{
+		testChunk("a", "p1", "concrete column", []float64{1, 0}, nil),
+		testChunk("b", "p1", "pipe clearance", []float64{0, 1}, nil),
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if sequence != 1 || store.Count() != 2 {
+		t.Fatalf("sequence=%d count=%d; want sequence=1 count=2", sequence, store.Count())
+	}
+	if err := store.Close(); err != nil {
+		t.Fatal(err)
+	}
+	reopened, err := Open(dir)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer reopened.Close()
+	if reopened.Sequence() != 1 || reopened.Count() != 2 {
+		t.Fatalf("replayed sequence=%d count=%d", reopened.Sequence(), reopened.Count())
+	}
+}
+
+func TestInvalidBatchDoesNotCommitAnyChunk(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	_, err = store.UpsertChunks([]Chunk{
+		testChunk("a", "p1", "vector one", []float64{1, 0}, nil),
+		testChunk("b", "p1", "different dimension", []float64{1, 0, 0}, nil),
+	})
+	if !errors.Is(err, ErrInvalidInput) {
+		t.Fatalf("expected ErrInvalidInput, got %v", err)
+	}
+	if store.Count() != 0 || store.Sequence() != 0 {
+		t.Fatalf("invalid batch partially committed: count=%d sequence=%d", store.Count(), store.Sequence())
+	}
+}
+
 func TestVectorDimensionMismatchRejectedWithoutCommit(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {
