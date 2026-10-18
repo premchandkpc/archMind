@@ -11,6 +11,7 @@ from civilmind.events.bus import STREAM_INGESTION, EventBus
 from civilmind.pipeline.chunker import Chunker
 from civilmind.pipeline.embedder import BaseEmbedder
 from civilmind.pipeline.parser import DocumentParser
+from civilmind.vector.native_db_store import NativeDBClient
 from civilmind.vector.qdrant_store import QdrantStore
 
 logger = structlog.get_logger()
@@ -106,7 +107,7 @@ async def handle_document_parsed(event: dict[str, Any], chunker: Chunker, bus: E
 async def handle_document_chunked(
     event: dict[str, Any],
     embedder: BaseEmbedder,
-    store: QdrantStore,
+    store: QdrantStore | NativeDBClient,
     bus: EventBus,
 ) -> None:
     """Embed chunks → upsert to Qdrant → publish document.embedded."""
@@ -131,12 +132,15 @@ async def handle_document_chunked(
     vectors = await embedder.embed_batch(contents)
     logger.info("Embedded chunks", document_id=document_id, count=len(vectors))
 
-    payloads = [c["metadata"] for c in raw_chunks]
-    point_ids = await store.upsert(
-        collection=DEFAULT_COLLECTION,
-        vectors=vectors,
-        payloads=payloads,
-    )
+    if isinstance(store, NativeDBClient):
+        point_ids = await store.upsert_chunks(raw_chunks, vectors)
+    else:
+        payloads = [c["metadata"] for c in raw_chunks]
+        point_ids = await store.upsert(
+            collection=DEFAULT_COLLECTION,
+            vectors=vectors,
+            payloads=payloads,
+        )
 
     chunks_with_ids = []
     for raw, point_id in zip(raw_chunks, point_ids):
