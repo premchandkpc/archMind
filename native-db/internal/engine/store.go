@@ -36,8 +36,8 @@ type recordType string
 const (
 	recordUpsertChunk      recordType = "upsert_chunk"
 	recordUpsertChunkBatch recordType = "upsert_chunk_batch"
-	recordDeleteChunk    recordType = "delete_chunk"
-	recordUpsertEvidence recordType = "upsert_evidence"
+	recordDeleteChunk      recordType = "delete_chunk"
+	recordUpsertEvidence   recordType = "upsert_evidence"
 )
 
 type walRecord struct {
