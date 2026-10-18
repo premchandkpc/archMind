@@ -4,7 +4,6 @@ from __future__ import annotations
 
 import asyncio
 import hmac
-import os
 from contextlib import asynccontextmanager
 from pathlib import Path
 from typing import Any
@@ -15,6 +14,7 @@ from pydantic import BaseModel, ConfigDict, Field
 
 from civilmind.native_db.models import Chunk
 from civilmind.native_db.store import NativeStore
+from civilmind.settings import settings
 
 logger = structlog.get_logger()
 
@@ -53,13 +53,13 @@ def create_app(
     """Create the standalone database service."""
     owns_store = store is None
     native_store = store
-    expected_token = api_token if api_token is not None else os.getenv("CIVILMIND_DB_TOKEN", "")
+    expected_token = api_token if api_token is not None else settings.CIVILMIND_DB_TOKEN
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
         if native_store is None:
             app.state.native_store = NativeStore(
-                data_dir or os.getenv("CIVILMIND_DB_DATA_DIR", ".civilmind-native-db")
+                data_dir or settings.CIVILMIND_DB_DATA_DIR
             )
         else:
             app.state.native_store = native_store
