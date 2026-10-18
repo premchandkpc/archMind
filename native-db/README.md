@@ -46,6 +46,10 @@ The WAL is authoritative. Each record is JSON encoded, length-prefixed, checksum
 
 The vector search is exact O(N×D); the lexical index consumes RAM proportional to tokens and postings. This keeps v0 understandable and testable, not suitable for unbounded corpora.
 
+## Validation
+
+The repository CI workflow runs gofmt, race-enabled tests, and go vet against this module.
+
 ## Explicit non-goals of v0
 
 No distributed replication, multi-process locking, concurrent multi-writer support across processes, WAL compaction, snapshots, ANN/HNSW index, vector quantization, database migration protocol, encrypted-at-rest records, or production-grade multi-tenant authorization. Use this first as an experimental retrieval backend with a rollback path, not as the only storage for business metadata.
