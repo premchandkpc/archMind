@@ -32,6 +32,7 @@ func (s *Server) routes() {
 	s.mux.HandleFunc("GET /health", s.health)
 	s.mux.Handle("GET /v1/stats", s.authorize(http.HandlerFunc(s.stats)))
 	s.mux.Handle("PUT /v1/chunks", s.authorize(http.HandlerFunc(s.putChunk)))
+	s.mux.Handle("PUT /v1/chunks/batch", s.authorize(http.HandlerFunc(s.putChunks)))
 	s.mux.Handle("DELETE /v1/chunks/{id}", s.authorize(http.HandlerFunc(s.deleteChunk)))
 	s.mux.Handle("GET /v1/chunks/{id}", s.authorize(http.HandlerFunc(s.getChunk)))
 	s.mux.Handle("POST /v1/search", s.authorize(http.HandlerFunc(s.search)))
@@ -86,6 +87,34 @@ func (s *Server) putChunk(w http.ResponseWriter, r *http.Request) {
 	}
 	writeJSON(w, http.StatusOK, map[string]any{
 		"id": chunk.ID, "sequence": sequence, "status": "committed",
+	})
+}
+
+type chunkBatchRequest struct {
+	Chunks []engine.Chunk `json:"chunks"`
+}
+
+func (s *Server) putChunks(w http.ResponseWriter, r *http.Request) {
+	var payload chunkBatchRequest
+	if err := decodeJSON(w, r, &payload); err != nil {
+		writeError(w, http.StatusBadRequest, err.Error())
+		return
+	}
+	if len(payload.Chunks) == 0 || len(payload.Chunks) > 1000 {
+		writeError(w, http.StatusUnprocessableEntity, "chunks must contain between 1 and 1000 items")
+		return
+	}
+	sequence, err := s.store.UpsertChunks(payload.Chunks)
+	if err != nil {
+		writeStoreError(w, err)
+		return
+	}
+	ids := make([]string, len(payload.Chunks))
+	for i, chunk := range payload.Chunks {
+		ids[i] = chunk.ID
+	}
+	writeJSON(w, http.StatusOK, map[string]any{
+		"ids": ids, "sequence": sequence, "count": len(ids), "status": "committed",
 	})
 }
 
