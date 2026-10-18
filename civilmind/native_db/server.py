@@ -82,7 +82,7 @@ def create_app(
 
     async def authorize(authorization: str | None = Header(default=None)) -> None:
         if not expected_token:
-            return
+            raise HTTPException(status_code=503, detail="CIVILMIND_DB_TOKEN must be configured")
         scheme, _, supplied = (authorization or "").partition(" ")
         if scheme.lower() != "bearer" or not hmac.compare_digest(supplied, expected_token):
             raise HTTPException(status_code=401, detail="invalid bearer token")
