@@ -21,6 +21,7 @@ from civilmind.pipeline.chunker import Chunker
 from civilmind.pipeline.embedder import EmbedderFactory
 from civilmind.pipeline.parser import DocumentParser
 from civilmind.settings import settings
+from civilmind.vector.native_db_store import NativeDBClient
 from civilmind.vector.qdrant_store import QdrantStore
 
 logger = structlog.get_logger()
@@ -76,10 +77,13 @@ class PipelineWorker:
         self._parser = DocumentParser()
         self._chunker = Chunker()
         self._embedder = EmbedderFactory.create()
-        self._store = QdrantStore(
-            url=settings.QDRANT_URL,
-            api_key=None,
-        )
+        if settings.RETRIEVAL_BACKEND == "native_db":
+            self._store: QdrantStore | NativeDBClient = NativeDBClient()
+        else:
+            self._store = QdrantStore(
+                url=settings.QDRANT_URL,
+                api_key=None,
+            )
 
     async def run(self) -> None:
         self._running = True
@@ -140,6 +144,13 @@ class PipelineWorker:
                     error=str(e),
                 )
                 await self._consumer.ack(self._stream, self._group, event_id)
+
+    async def aclose(self) -> None:
+        """Close the retrieval backend after event consumption has stopped."""
+        if isinstance(self._store, NativeDBClient):
+            await self._store.close()
+        else:
+            self._store.close()
 
     def stop(self) -> None:
         self._running = False
