@@ -163,7 +163,7 @@ func (idx *searchIndex) vectorSearch(query []float64, allowed map[string]struct{
 		return nil, fmt.Errorf("%w: empty query vector", ErrInvalidInput)
 	}
 	queryNorm := vectorNorm(query)
-	if queryNorm == 0 {
+	if queryNorm == 0 || math.IsInf(queryNorm, 0) || math.IsNaN(queryNorm) {
 		return nil, fmt.Errorf("%w: query vector is zero", ErrInvalidInput)
 	}
 	hits := make([]lexicalHit, 0)
@@ -176,14 +176,14 @@ func (idx *searchIndex) vectorSearch(query []float64, allowed map[string]struct{
 			return nil, fmt.Errorf("%w: query vector dimension %d differs from stored dimension %d", ErrInvalidInput, len(query), len(chunk.Vector))
 		}
 		norm := vectorNorm(chunk.Vector)
-		if norm == 0 {
+		if norm == 0 || math.IsInf(norm, 0) || math.IsNaN(norm) {
 			continue
 		}
-		dot := 0.0
+		cosine := 0.0
 		for i := range query {
-			dot += query[i] * chunk.Vector[i]
+			cosine += (query[i] / queryNorm) * (chunk.Vector[i] / norm)
 		}
-		hits = append(hits, lexicalHit{id: id, score: dot / (queryNorm * norm)})
+		hits = append(hits, lexicalHit{id: id, score: cosine})
 	}
 	sort.Slice(hits, func(i, j int) bool {
 		if hits[i].score == hits[j].score {
