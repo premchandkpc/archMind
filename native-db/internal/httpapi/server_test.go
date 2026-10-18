@@ -65,6 +65,26 @@ func TestChunkSearchAPIRequiresTokenAndReturnsResults(t *testing.T) {
 	}
 }
 
+func TestBatchEndpointCommitsChunksWithOneSequence(t *testing.T) {
+	store, err := engine.Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+	handler := New(store, "secret")
+	body := `{"chunks":[{"id":"a","project_id":"p1","document_id":"d1","revision_id":"r1","content":"concrete column","vector":[1,0]},{"id":"b","project_id":"p1","document_id":"d2","revision_id":"r1","content":"pipe route","vector":[0,1]}]}`
+	request := httptest.NewRequest(http.MethodPut, "/v1/chunks/batch", bytes.NewBufferString(body))
+	request.Header.Set("Authorization", "Bearer secret")
+	response := httptest.NewRecorder()
+	handler.ServeHTTP(response, request)
+	if response.Code != http.StatusOK {
+		t.Fatalf("batch status=%d body=%s", response.Code, response.Body.String())
+	}
+	if store.Count() != 2 || store.Sequence() != 1 {
+		t.Fatalf("count=%d sequence=%d; want count=2 sequence=1", store.Count(), store.Sequence())
+	}
+}
+
 func TestMissingTokenFailsClosed(t *testing.T) {
 	store, err := engine.Open(t.TempDir())
 	if err != nil {
