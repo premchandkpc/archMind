@@ -22,6 +22,10 @@ class Settings(BaseSettings):
     DEBUG: bool = Field(default=False)
     SECRET_KEY: str = Field(default="")
 
+    # ---------- CivilMind Native DB (standalone prototype) ----------
+    CIVILMIND_DB_DATA_DIR: str = Field(default=".civilmind-native-db")
+    CIVILMIND_DB_TOKEN: str = Field(default="")
+
     # ============================================================
     # PostgreSQL
     # ============================================================
