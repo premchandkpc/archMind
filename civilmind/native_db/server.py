@@ -52,17 +52,26 @@ def create_app(
 ) -> FastAPI:
     """Create the standalone database service."""
     owns_store = store is None
-    native_store = store or NativeStore(
-        data_dir or os.getenv("CIVILMIND_DB_DATA_DIR", ".civilmind-native-db")
-    )
+    native_store = store
     expected_token = api_token if api_token is not None else os.getenv("CIVILMIND_DB_TOKEN", "")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
-        app.state.native_store = native_store
+        if native_store is None:
+            app.state.native_store = NativeStore(
+                data_dir or os.getenv("CIVILMIND_DB_DATA_DIR", ".civilmind-native-db")
+            )
+        else:
+            app.state.native_store = native_store
         yield
         if owns_store:
-            native_store.close()
+            app.state.native_store.close()
+
+    def get_store() -> NativeStore:
+        active_store = getattr(app.state, "native_store", None)
+        if active_store is None:
+            raise RuntimeError("native DB application lifespan has not started")
+        return active_store
 
     app = FastAPI(
         title="CivilMind Native DB",
@@ -80,13 +89,13 @@ def create_app(
 
     @app.get("/health")
     async def health() -> dict[str, Any]:
-        return {"status": "ok", **native_store.stats()}
+        return {"status": "ok", **get_store().stats()}
 
     @app.put("/v1/chunks", dependencies=[Depends(authorize)])
     async def put_chunk(payload: ChunkWrite) -> dict[str, Any]:
         try:
             seq = await asyncio.to_thread(
-                native_store.upsert,
+                get_store().upsert,
                 Chunk(
                     id=payload.id, project_id=payload.project_id, document_id=payload.document_id,
                     revision_id=payload.revision_id, content=payload.content,
@@ -103,7 +112,7 @@ def create_app(
     @app.delete("/v1/chunks/{chunk_id}", dependencies=[Depends(authorize)])
     async def delete_chunk(chunk_id: str) -> dict[str, Any]:
         try:
-            seq = await asyncio.to_thread(native_store.delete, chunk_id)
+            seq = await asyncio.to_thread(get_store().delete, chunk_id)
             return {"id": chunk_id, "sequence": seq, "status": "deleted"}
         except Exception as exc:
             logger.error("native DB delete failed", error=str(exc))
@@ -113,7 +122,7 @@ def create_app(
     async def search(payload: SearchRequest) -> dict[str, Any]:
         try:
             hits = await asyncio.to_thread(
-                native_store.search, payload.query, project_id=payload.project_id,
+                get_store().search, payload.query, project_id=payload.project_id,
                 metadata_filter=payload.metadata_filter, query_vector=payload.query_vector,
                 limit=payload.limit,
             )
@@ -129,7 +138,7 @@ def create_app(
                     }
                     for hit in hits
                 ],
-                "count": len(hits), "sequence": native_store.sequence,
+                "count": len(hits), "sequence": get_store().sequence,
             }
         except ValueError as exc:
             raise HTTPException(status_code=422, detail=str(exc)) from exc
@@ -139,7 +148,7 @@ def create_app(
 
     @app.get("/v1/stats", dependencies=[Depends(authorize)])
     async def stats() -> dict[str, Any]:
-        return native_store.stats()
+        return get_store().stats()
 
     return app
 
