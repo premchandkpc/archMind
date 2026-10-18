@@ -34,7 +34,8 @@ var (
 type recordType string
 
 const (
-	recordUpsertChunk    recordType = "upsert_chunk"
+	recordUpsertChunk      recordType = "upsert_chunk"
+	recordUpsertChunkBatch recordType = "upsert_chunk_batch"
 	recordDeleteChunk    recordType = "delete_chunk"
 	recordUpsertEvidence recordType = "upsert_evidence"
 )
@@ -43,6 +44,7 @@ type walRecord struct {
 	Sequence int64      `json:"sequence"`
 	Type     recordType `json:"type"`
 	Chunk    *Chunk     `json:"chunk,omitempty"`
+	Chunks   []Chunk    `json:"chunks,omitempty"`
 	ChunkID  string     `json:"chunk_id,omitempty"`
 	Evidence *Evidence  `json:"evidence,omitempty"`
 }
@@ -130,6 +132,41 @@ func (s *Store) UpsertChunk(chunk Chunk) (int64, error) {
 		return 0, err
 	}
 	s.applyChunk(chunk)
+	s.sequence = seq
+	return seq, nil
+}
+
+// UpsertChunks atomically appends and applies a batch of chunks using one WAL sync.
+// A failed validation or WAL append leaves the visible database state unchanged.
+func (s *Store) UpsertChunks(chunks []Chunk) (int64, error) {
+	if len(chunks) == 0 {
+		return 0, fmt.Errorf("%w: at least one chunk is required", ErrInvalidInput)
+	}
+	if len(chunks) > 1000 {
+		return 0, fmt.Errorf("%w: a batch may contain at most 1000 chunks", ErrInvalidInput)
+	}
+	copied := make([]Chunk, len(chunks))
+	for i, chunk := range chunks {
+		if err := validateChunk(chunk); err != nil {
+			return 0, fmt.Errorf("chunk[%d]: %w", i, err)
+		}
+		copied[i] = cloneChunk(chunk)
+	}
+	s.mu.Lock()
+	defer s.mu.Unlock()
+	if err := s.ensureOpen(); err != nil {
+		return 0, err
+	}
+	if err := validateBatchAgainstCurrent(copied, s.chunks); err != nil {
+		return 0, err
+	}
+	seq, err := s.append(walRecord{Type: recordUpsertChunkBatch, Chunks: copied})
+	if err != nil {
+		return 0, err
+	}
+	for _, chunk := range copied {
+		s.applyChunk(chunk)
+	}
 	s.sequence = seq
 	return seq, nil
 }
@@ -501,6 +538,23 @@ func (s *Store) applyReplayRecord(record walRecord) error {
 			return err
 		}
 		s.applyChunk(*record.Chunk)
+	case recordUpsertChunkBatch:
+		if len(record.Chunks) == 0 {
+			return errors.New("batch upsert record is empty")
+		}
+		if err := validateBatchAgainstCurrent(record.Chunks, s.chunks); err != nil {
+			return err
+		}
+		seen := make(map[string]struct{}, len(record.Chunks))
+		for _, chunk := range record.Chunks {
+			if _, duplicate := seen[chunk.ID]; duplicate {
+				return fmt.Errorf("duplicate chunk ID %q in WAL batch", chunk.ID)
+			}
+			seen[chunk.ID] = struct{}{}
+		}
+		for _, chunk := range record.Chunks {
+			s.applyChunk(chunk)
+		}
 	case recordDeleteChunk:
 		if record.ChunkID == "" {
 			return errors.New("delete record is missing chunk ID")
@@ -517,6 +571,41 @@ func (s *Store) applyReplayRecord(record walRecord) error {
 		s.evidence[record.Evidence.ID] = *record.Evidence
 	default:
 		return fmt.Errorf("unknown record type %q", record.Type)
+	}
+	return nil
+}
+
+func validateBatchAgainstCurrent(chunks []Chunk, current map[string]Chunk) error {
+	replaced := make(map[string]struct{}, len(chunks))
+	seen := make(map[string]struct{}, len(chunks))
+	for i, chunk := range chunks {
+		if err := validateChunk(chunk); err != nil {
+			return fmt.Errorf("chunk[%d]: %w", i, err)
+		}
+		if _, duplicate := seen[chunk.ID]; duplicate {
+			return fmt.Errorf("%w: duplicate chunk ID %q in batch", ErrInvalidInput, chunk.ID)
+		}
+		seen[chunk.ID] = struct{}{}
+		replaced[chunk.ID] = struct{}{}
+	}
+	dimension := 0
+	for id, existing := range current {
+		if _, overwrite := replaced[id]; overwrite || len(existing.Vector) == 0 {
+			continue
+		}
+		if dimension != 0 && dimension != len(existing.Vector) {
+			return fmt.Errorf("%w: inconsistent stored vector dimensions", ErrCorruptWAL)
+		}
+		dimension = len(existing.Vector)
+	}
+	for _, chunk := range chunks {
+		if len(chunk.Vector) == 0 {
+			continue
+		}
+		if dimension != 0 && dimension != len(chunk.Vector) {
+			return fmt.Errorf("%w: vector dimension must be %d", ErrInvalidInput, dimension)
+		}
+		dimension = len(chunk.Vector)
 	}
 	return nil
 }
