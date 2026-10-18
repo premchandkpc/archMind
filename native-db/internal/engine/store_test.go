@@ -191,6 +191,31 @@ func TestZeroVectorRejected(t *testing.T) {
 	}
 }
 
+func TestCosineSimilarityHandlesLargeFiniteVectors(t *testing.T) {
+	store, err := Open(t.TempDir())
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer store.Close()
+
+	large := []float64{1e308, 1e308}
+	if _, err := store.UpsertChunk(testChunk("large", "p1", "large vector", large, nil)); err != nil {
+		t.Fatal(err)
+	}
+	hits, err := store.Search(SearchOptions{
+		Query: "large", ProjectID: "p1", QueryVector: []float64{1e308, 1e308},
+	})
+	if err != nil {
+		t.Fatal(err)
+	}
+	if len(hits) != 1 || hits[0].VectorScore == nil {
+		t.Fatalf("unexpected search results: %#v", hits)
+	}
+	if *hits[0].VectorScore < 0.999999 {
+		t.Fatalf("cosine score = %v, want approximately 1", *hits[0].VectorScore)
+	}
+}
+
 func TestMetadataNumbersAndNestedObjectsMatchByJSONValue(t *testing.T) {
 	store, err := Open(t.TempDir())
 	if err != nil {
