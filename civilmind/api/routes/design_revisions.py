@@ -112,7 +112,17 @@ def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]:
 
     # Include both revision edge sets so removals can still surface dependencies that
     # existed before the edit. The result is a candidate impact list, not a guarantee.
-    relationships = tuple(dict.fromkeys((*base.relationships, *head.relationships)))
+    relationship_by_key = {
+        (edge.source_id, edge.target_id, edge.relation_type, edge.provenance): edge
+        for edge in base.relationships
+    }
+    relationship_by_key.update(
+        {
+            (edge.source_id, edge.target_id, edge.relation_type, edge.provenance): edge
+            for edge in head.relationships
+        }
+    )
+    relationships = tuple(relationship_by_key[key] for key in sorted(relationship_by_key))
     impacts = ImpactGraph(relationships).impacted(
         sorted(changed_ids),
         max_depth=request.max_impact_depth,
