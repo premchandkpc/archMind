@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>ArchMind · Drawing control</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1118;--panel:#121c27;--line:#293746;--text:#edf3fa;--muted:#95a5b7;--mint:#8ce0c1;--blue:#9ac5ff;--amber:#f3ca7a;--red:#ff969e}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:14px/1.5 Inter,system-ui,sans-serif}button,input{font:inherit}.shell{max-width:1280px;margin:auto;padding:24px}.top,.heading,.actions,.row,.sheet-title,.section-head{display:flex;align-items:center;justify-content:space-between;gap:14px}.top{margin-bottom:32px}.brand{display:flex;align-items:center;gap:12px}.logo{width:42px;height:42px;display:grid;place-items:center;background:var(--mint);color:#0c2019;border-radius:12px;font-weight:900;font-size:20px}.eyebrow{font-size:11px;letter-spacing:.12em;text-transform:uppercase;color:var(--muted)}h1,h2,h3,p{margin-top:0}h1{font-size:19px;margin-bottom:0}h2{font-size:29px;letter-spacing:-.04em;margin:4px 0}h3{font-size:14px;margin:0}.sub{color:var(--muted)}.btn{border:1px solid var(--line);background:#192532;color:var(--text);padding:9px 13px;border-radius:9px;cursor:pointer}.btn.primary{background:var(--mint);border-color:transparent;color:#0c2019;font-weight:750}.btn:disabled{opacity:.5;cursor:not-allowed}.grid{display:grid;grid-template-columns:minmax(0,1.6fr) minmax(290px,.8fr);gap:16px}.stats{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:12px;margin:22px 0}.stat,.card{background:var(--panel);border:1px solid var(--line);border-radius:14px}.stat{padding:15px}.stat small{display:block;color:var(--muted)}.stat strong{display:block;font-size:24px;margin:4px 0}.card{overflow:hidden;margin-bottom:16px}.section-head{padding:15px 17px;border-bottom:1px solid var(--line)}.body{padding:16px}.pill{font-size:11px;border:1px solid var(--line);border-radius:99px;padding:4px 8px;color:var(--muted)}.good{color:var(--mint)}.warn{color:var(--amber)}.bad{color:var(--red)}.table{width:100%;border-collapse:collapse}.table th,.table td{text-align:left;padding:12px 10px;border-bottom:1px solid var(--line);font-size:12px}.table th{color:var(--muted);font-weight:500}.table tr:last-child td{border-bottom:0}.drop{border:1px dashed #587084;border-radius:12px;padding:22px;text-align:center;background:#0e1721}.drop strong{display:block;margin:7px 0}.drop p{color:var(--muted);font-size:12px;margin-bottom:12px}.drop input{max-width:100%;font-size:12px}.results{margin-top:14px;display:none}.result{padding:12px 0;border-bottom:1px solid var(--line)}.result:last-child{border-bottom:0}.result p{font-size:12px;color:var(--muted);margin:4px 0}.reason{width:100%;min-height:90px;background:#0b131c;color:var(--text);border:1px solid var(--line);border-radius:9px;padding:10px;font:inherit}.notice{border:1px solid #66512c;background:#211e17;color:#ddcda9;border-radius:10px;padding:12px;font-size:12px;margin-bottom:16px}.step{display:flex;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}.step:last-child{border:0}.num{width:26px;height:26px;flex:none;display:grid;place-items:center;border-radius:8px;background:#1d302e;color:var(--mint);font-weight:800}.step p{font-size:12px;color:var(--muted);margin:3px 0 0}.footer{font-size:11px;color:var(--muted);margin:12px 2px}.toast{position:fixed;bottom:18px;left:50%;transform:translateX(-50%);background:#e4fff4;color:#10241d;padding:11px 15px;border-radius:9px;display:none;max-width:90vw}
+@media(max-width:850px){.grid{grid-template-columns:1fr}.heading{align-items:flex-start;flex-direction:column}.stats{grid-template-columns:1fr 1fr}}@media(max-width:540px){.shell{padding:13px}.top{align-items:flex-start}.top .actions{flex-direction:column}.stats{gap:8px}.table th:nth-child(4),.table td:nth-child(4){display:none}h2{font-size:24px}}
+</style>
+</head>
+<body>
+<div class="shell">
+<header class="top">
+  <div class="brand"><div class="logo">A</div><div><div class="eyebrow">ArchMind / Project workspace</div><h1>Drawing control</h1></div></div>
+  <div class="actions"><button class="btn" id="compare">Compare PDFs</button><button class="btn primary" id="uploadFocus">＋ Add drawing PDF</button></div>
+</header>
+<section class="heading">
+  <div><div class="eyebrow">Project · Hyderabad · Residential</div><h2>Courtyard House</h2><div class="sub">One source of truth for issued drawings, changes and approvals.</div></div>
+  <span class="pill warn">Prototype workspace · sample records</span>
+</section>
+<section class="stats">
+  <div class="stat"><small>Sheets tracked</small><strong>18</strong><small>Across architecture and MEP</small></div>
+  <div class="stat"><small>Issued revisions</small><strong>18 <span class="good" style="font-size:12px">✓</span></strong><small>One current issue per sheet</small></div>
+  <div class="stat"><small>Needs human matching</small><strong id="unmatchedCount">2</strong><small>Unclear title blocks are never guessed</small></div>
+</section>
+<div class="grid">
+<main>
+  <section class="card">
+    <div class="section-head"><h3>Current issued drawings</h3><span class="pill">Sample data</span></div>
+    <div class="body" style="padding:4px 12px">
+      <table class="table">
+        <thead><tr><th>Sheet</th><th>Current issue</th><th>Status</th><th>Issued</th></tr></thead>
+        <tbody>
+          <tr><td><strong>A-101</strong><br><span class="sub">Ground floor plan</span></td><td>R5</td><td class="good">● Issued</td><td>19 Oct</td></tr>
+          <tr><td><strong>A-202</strong><br><span class="sub">Elevations</span></td><td>R3</td><td class="good">● Issued</td><td>17 Oct</td></tr>
+          <tr><td><strong>S-101</strong><br><span class="sub">Foundation plan</span></td><td>R2</td><td class="good">● Issued</td><td>16 Oct</td></tr>
+          <tr><td><strong>M-104</strong><br><span class="sub">Drainage layout</span></td><td>R4</td><td class="good">● Issued</td><td>15 Oct</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+  <section class="card" id="ingestCard">
+    <div class="section-head"><h3>Identify an incoming revision</h3><span class="pill">PDF-first</span></div>
+    <div class="body">
+      <div class="drop">
+        <div style="font-size:26px">⇧</div><strong>Drop a drawing PDF or choose a file</strong>
+        <p>Text-based PDFs up to 25 MiB, 200 pages. Scanned pages go to human review.</p>
+        <form id="inspectForm"><input id="pdfFile" name="file" type="file" accept="application/pdf,.pdf" required><div style="margin-top:12px"><button class="btn primary" type="submit" id="inspectButton">Inspect title block</button></div></form>
+      </div>
+      <div class="results" id="results" aria-live="polite"></div>
+    </div>
+  </section>
+  <section class="card">
+    <div class="section-head"><h3>Revision comparison</h3><span class="pill">Human-reviewed diff</span></div>
+    <div class="body">
+      <div class="row"><div><strong>A-101 · Ground floor plan</strong><div class="sub">R4 → R5 · Sample comparison</div></div><span class="pill warn">3 changes</span></div>
+      <div class="result"><strong>Wall W-102 · Kitchen east</strong><p>Visual change candidate: length annotation changed from 3,000 mm to 2,700 mm.</p></div>
+      <div class="result"><strong>Dimension annotation D-04</strong><p>Check whether the opening clearance note still matches the geometry.</p></div>
+      <div class="result"><strong>Decision record missing</strong><p>Attach the client request or meeting note that explains the change.</p></div>
+      <button class="btn" id="viewDiff" style="margin-top:12px">Open comparison (sample)</button>
+    </div>
+  </section>
+</main>
+<aside>
+  <section class="card">
+    <div class="section-head"><h3>Revision issue workflow</h3></div>
+    <div class="body">
+      <div class="step"><div class="num">1</div><div><strong>Upload or forward</strong><p>Keep existing email and shared-folder habits.</p></div></div>
+      <div class="step"><div class="num">2</div><div><strong>Match sheet + revision</strong><p>Extract explicit title-block labels. Uncertain results wait for a person.</p></div></div>
+      <div class="step"><div class="num">3</div><div><strong>Compare and review</strong><p>Highlight changes and record the reason, reviewer and decision.</p></div></div>
+      <div class="step"><div class="num">4</div><div><strong>Issue atomically</strong><p>Supersede the old issue and issue the approved revision in one database transaction.</p></div></div>
+    </div>
+  </section>
+  <section class="card">
+    <div class="section-head"><h3>Decision log</h3><span class="pill">Sample</span></div>
+    <div class="body">
+      <label for="decision" class="sub" style="display:block;margin-bottom:7px">Why did this revision happen?</label>
+      <textarea class="reason" id="decision" placeholder="Client request, meeting note, site instruction…"></textarea>
+      <button class="btn" id="saveDecision" style="margin-top:10px;width:100%">Capture decision note</button>
+    </div>
+  </section>
+  <div class="notice">Safety boundary: a PDF comparison is a review aid, not a code-compliance or structural approval. A named human remains responsible for approval and issue.</div>
+</aside>
+</div>
+<p class="footer">The sheet register and issue history above are illustrative. “Inspect title block” calls the API only when this page is served from the same origin as the backend. This prototype does not persist revisions or issue drawings.</p>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+const toastEl=document.getElementById("toast");
+function toast(message){toastEl.textContent=message;toastEl.style.display="block";window.clearTimeout(toast.timer);toast.timer=window.setTimeout(()=>toastEl.style.display="none",2800)}
+document.getElementById("uploadFocus").addEventListener("click",()=>{document.getElementById("ingestCard").scrollIntoView({behavior:"smooth"});document.getElementById("pdfFile").focus()});
+document.getElementById("compare").addEventListener("click",()=>{document.querySelector(".card:nth-of-type(3)")?.scrollIntoView({behavior:"smooth"});toast("Comparison is illustrative in this prototype")});
+document.getElementById("viewDiff").addEventListener("click",()=>toast("Sample diff only. Production comparison is not connected yet."));
+document.getElementById("saveDecision").addEventListener("click",()=>{const value=document.getElementById("decision").value.trim();toast(value?"Prototype only: decision note was not persisted.":"Add a reason before capturing a note.")});
+document.getElementById("inspectForm").addEventListener("submit",async event=>{
+ event.preventDefault();
+ const file=document.getElementById("pdfFile").files[0];if(!file)return;
+ const button=document.getElementById("inspectButton"),results=document.getElementById("results");
+ button.disabled=true;button.textContent="Inspecting…";results.style.display="block";results.textContent="Extracting PDF text and looking for explicit title-block labels…";
+ try{
+   const form=new FormData();form.append("file",file);
+   const response=await fetch("/drawing-revisions/inspect",{method:"POST",body:form});
+   const data=await response.json();
+   if(!response.ok)throw new Error(data.detail||"PDF inspection failed");
+   results.replaceChildren();
+   const summary=document.createElement("div");summary.className="result";
+   summary.innerHTML="<strong>"+data.matched_pages+" page(s) matched · "+data.unmatched_pages+" unmatched</strong><p>SHA-256: "+data.sha256+"</p>";results.append(summary);
+   for(const page of data.pages){
+     const row=document.createElement("div");row.className="result";
+     const title=document.createElement("strong");title.textContent="Page "+page.page_number+" · "+(page.sheet_number||"Sheet not identified")+" · "+(page.revision_label||"Revision not identified");
+     const status=document.createElement("span");status.className="pill "+(page.status==="matched"?"good":"warn");status.textContent=page.status==="matched"?"Candidate match":"Human review";
+     const note=document.createElement("p");note.textContent="Project: "+(page.project_name||"not identified")+" · confidence "+page.confidence+" · missing: "+(page.missing_fields.join(", ")||"none");
+     row.append(title,status,note);results.append(row);
+   }
+   for(const limitation of data.limitations){const p=document.createElement("p");p.className="footer";p.textContent=limitation;results.append(p)}
+ }catch(error){results.textContent="API unavailable or PDF could not be inspected: "+error.message+". Serve this page from the backend origin to try live title-block extraction."}
+ finally{button.disabled=false;button.textContent="Inspect title block"}
+});
+</script>
+</body>
+</html>
