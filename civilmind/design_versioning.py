@@ -193,6 +193,7 @@ def compare_relationships(
     base: DesignSnapshot, head: DesignSnapshot
 ) -> list[RelationshipChange]:
     """Diff dependency edges, including changes in relationship confidence."""
+
     def index(snapshot: DesignSnapshot) -> dict[tuple[str, str, str, str], Relationship]:
         return {
             (edge.source_id, edge.target_id, edge.relation_type, edge.provenance): edge
@@ -207,11 +208,21 @@ def compare_relationships(
         new = after.get(key)
         if old is None and new is not None:
             changes.append(
-                RelationshipChange("added", *key, before_confidence=None, after_confidence=new.confidence)
+                RelationshipChange(
+                    "added",
+                    *key,
+                    before_confidence=None,
+                    after_confidence=new.confidence,
+                )
             )
         elif new is None and old is not None:
             changes.append(
-                RelationshipChange("removed", *key, before_confidence=old.confidence, after_confidence=None)
+                RelationshipChange(
+                    "removed",
+                    *key,
+                    before_confidence=old.confidence,
+                    after_confidence=None,
+                )
             )
         elif old is not None and new is not None and old.confidence != new.confidence:
             changes.append(
