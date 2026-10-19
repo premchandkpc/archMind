@@ -2,11 +2,18 @@
 
 from __future__ import annotations
 
+import json
 import math
 
 import pytest
+from fastapi import FastAPI
+from fastapi.testclient import TestClient
 
-from civilmind.api.routes.design_revisions import AnalyzeRevisionRequest, analyze_revision
+from civilmind.api.routes.design_revisions import (
+    AnalyzeRevisionRequest,
+    analyze_revision,
+    router as design_revisions_router,
+)
 from civilmind.design_versioning import (
     DesignObject,
     DesignSnapshot,
@@ -284,3 +291,96 @@ def test_analysis_endpoint_returns_diff_impacts_and_rule_evidence() -> None:
         "door.minimum_width",
         "room.minimum_area",
     ]
+
+
+
+@pytest.mark.parametrize("bad_number", [math.nan, math.inf, -math.inf])
+def test_api_rejects_non_finite_nested_property_numbers_with_422(bad_number: float) -> None:
+    app = FastAPI()
+    app.include_router(design_revisions_router)
+    client = TestClient(app)
+    payload = {
+        "base": {
+            "revision_id": "R1",
+            "objects": [
+                {"object_id": "room-1", "kind": "room", "properties": {"nested": [bad_number]}}
+            ],
+        },
+        "head": {"revision_id": "R2", "objects": []},
+    }
+
+    response = client.post(
+        "/design-revisions/analyze",
+        content=json.dumps(payload, allow_nan=True),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert "NaN or Infinity" in response.text
+
+
+def test_api_rejects_oversized_property_integer_with_422() -> None:
+    app = FastAPI()
+    app.include_router(design_revisions_router)
+    client = TestClient(app)
+    payload = {
+        "base": {
+            "revision_id": "R1",
+            "objects": [
+                {"object_id": "room-1", "kind": "room", "properties": {"area_sqm": 10**400}}
+            ],
+        },
+        "head": {"revision_id": "R2", "objects": []},
+    }
+
+    response = client.post(
+        "/design-revisions/analyze",
+        content=json.dumps(payload),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 422
+    assert "signed 64-bit range" in response.text
+
+
+def test_nan_property_in_both_revisions_does_not_report_a_change() -> None:
+    base = DesignSnapshot("R1", (DesignObject("room-1", "room", {"area_sqm": math.nan}),))
+    head = DesignSnapshot("R2", (DesignObject("room-1", "room", {"area_sqm": math.nan}),))
+
+    assert compare_snapshots(base, head) == []
+
+
+def test_minimum_rules_handle_huge_integer_without_float_overflow() -> None:
+    snapshot = DesignSnapshot(
+        "R1",
+        (
+            DesignObject("room-1", "room", {"area_sqm": 10**400}),
+            DesignObject("door-1", "door", {"width_mm": 10**400}),
+        ),
+    )
+
+    assert evaluate_minimum_rules(
+        snapshot,
+        minimum_room_area_sqm=10.0,
+        minimum_door_width_mm=800.0,
+    ) == []
+
+
+@pytest.mark.parametrize("bad_threshold", [math.nan, math.inf, -math.inf])
+def test_api_rejects_non_finite_rule_thresholds_with_422(bad_threshold: float) -> None:
+    app = FastAPI()
+    app.include_router(design_revisions_router)
+    client = TestClient(app)
+    payload = {
+        "base": {"revision_id": "R1", "objects": []},
+        "head": {"revision_id": "R2", "objects": []},
+        "minimum_room_area_sqm": bad_threshold,
+    }
+
+    response = client.post(
+        "/design-revisions/analyze",
+        content=json.dumps(payload, allow_nan=True),
+        headers={"content-type": "application/json"},
+    )
+
+    assert response.status_code == 422
