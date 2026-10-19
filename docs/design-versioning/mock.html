@@ -1,0 +1,114 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>ArchMind · Design revisions</title>
+<style>
+:root{color-scheme:dark;--bg:#0b1017;--panel:#111923;--panel2:#151f2b;--line:#273444;--text:#edf3fa;--muted:#8fa0b4;--accent:#8ce0c1;--blue:#8dbdff;--red:#ff8d96;--yellow:#f3cb7b;--green:#73d7ae}
+*{box-sizing:border-box}body{margin:0;background:radial-gradient(ellipse at 20% -20%,#1a3040 0,transparent 45%),var(--bg);color:var(--text);font:14px/1.45 Inter,ui-sans-serif,system-ui,-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}button,select{font:inherit}button{cursor:pointer;color:inherit}.app{max-width:1500px;margin:auto;padding:22px}.top{display:flex;align-items:center;justify-content:space-between;gap:18px;margin-bottom:24px}.brand{display:flex;gap:12px;align-items:center}.logo{display:grid;place-items:center;width:42px;height:42px;border-radius:13px;background:linear-gradient(135deg,#9ae8c9,#75aef7);color:#0b1820;font-weight:900;font-size:19px}.eyebrow{color:var(--muted);font-size:11px;text-transform:uppercase;letter-spacing:.13em}.brand h1{font-size:18px;margin:2px 0 0}.top-actions{display:flex;align-items:center;gap:9px}.btn{border:1px solid var(--line);background:var(--panel2);padding:9px 13px;border-radius:9px}.btn.primary{background:var(--accent);color:#0b2019;border-color:transparent;font-weight:750}.btn:hover{filter:brightness(1.12)}.project-head{display:flex;justify-content:space-between;align-items:flex-end;gap:20px;margin-bottom:18px}.project-head h2{font-size:27px;letter-spacing:-.04em;margin:4px 0}.sub{color:var(--muted)}.status{border:1px solid #315d50;color:var(--green);background:#11271f;padding:6px 10px;border-radius:99px;font-size:12px;white-space:nowrap}.stats{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.stat,.card{background:linear-gradient(160deg,rgba(21,31,43,.96),rgba(15,23,33,.96));border:1px solid var(--line);border-radius:14px}.stat{padding:15px 17px}.stat .label{color:var(--muted);font-size:12px}.stat .value{font-size:24px;font-weight:750;letter-spacing:-.04em;margin-top:4px}.stat .hint{color:var(--muted);font-size:11px;margin-top:3px}.layout{display:grid;grid-template-columns:minmax(0,1.65fr) minmax(300px,.85fr);gap:16px}.card{overflow:hidden}.card-head{padding:15px 17px;border-bottom:1px solid var(--line);display:flex;justify-content:space-between;align-items:center;gap:12px}.card-head h3{font-size:14px;margin:0}.card-body{padding:16px}.pill{font-size:11px;border:1px solid var(--line);color:var(--muted);padding:4px 8px;border-radius:99px}.timeline{display:flex;gap:9px;overflow:auto;padding-bottom:4px}.revision{min-width:145px;flex:1;text-align:left;border:1px solid var(--line);background:#0e1620;border-radius:10px;padding:12px}.revision.active{border-color:var(--accent);box-shadow:inset 0 0 0 1px #8ce0c144;background:#14251f}.revision strong{display:block;font-size:13px;margin:7px 0 3px}.revision small{color:var(--muted)}.dot{display:inline-block;width:8px;height:8px;border-radius:50%;background:var(--green);margin-right:6px}.revision .rnum{color:var(--muted);font-size:11px}.split{display:grid;grid-template-columns:1fr 1fr;gap:12px}.model{border:1px solid var(--line);border-radius:12px;overflow:hidden;background:#0b141d}.model-title{display:flex;justify-content:space-between;align-items:center;padding:10px 12px;border-bottom:1px solid var(--line);font-size:12px}.model-title span:last-child{color:var(--muted)}.plan{display:block;width:100%;height:auto;min-height:205px;background:#0a131b}.legend{display:flex;gap:13px;flex-wrap:wrap;color:var(--muted);font-size:11px;margin-top:11px}.legend i{display:inline-block;width:8px;height:8px;border-radius:2px;margin-right:5px}.change-list{margin-top:18px}.change-row{display:grid;grid-template-columns:26px 1fr auto;gap:10px;align-items:start;padding:12px 0;border-bottom:1px solid #202d3a}.change-row:last-child{border-bottom:0}.change-icon{width:25px;height:25px;display:grid;place-items:center;border-radius:7px;background:#1a2a37;color:var(--blue);font-weight:800}.change-row strong{display:block;font-size:12px}.change-row p{margin:3px 0 0;color:var(--muted);font-size:12px}.delta{font-size:11px;border-radius:6px;padding:4px 7px;background:#2b2028;color:var(--red);white-space:nowrap}.delta.green{background:#142d25;color:var(--green)}.impact-summary{display:flex;gap:10px;align-items:flex-start;padding:12px;border:1px solid #5c4b2c;background:#211e17;border-radius:10px;margin-bottom:14px}.impact-summary .icon{font-size:18px;color:var(--yellow)}.impact-summary strong{display:block;font-size:12px}.impact-summary p{margin:4px 0 0;color:#c5b99e;font-size:12px}.finding{padding:12px 0;border-bottom:1px solid #202d3a}.finding:last-child{border:0}.finding-top{display:flex;justify-content:space-between;gap:10px;align-items:center}.finding strong{font-size:12px}.severity{font-size:10px;text-transform:uppercase;letter-spacing:.07em;color:var(--yellow)}.finding p{color:var(--muted);font-size:12px;margin:5px 0}.path{color:#9fc6ff;font:11px ui-monospace,SFMono-Regular,Menlo,monospace;overflow-wrap:anywhere}.finding-actions{display:flex;gap:7px;margin-top:8px}.mini{font-size:11px;border:1px solid var(--line);background:#121c27;border-radius:7px;padding:6px 9px}.mini.accept{color:var(--green)}.mini.dismiss{color:var(--muted)}.decision{margin-top:15px;padding:13px;border:1px solid var(--line);border-radius:10px;background:#0e1620}.decision label{display:block;font-size:11px;color:var(--muted);margin-bottom:7px}.decision textarea{width:100%;min-height:66px;resize:vertical;background:#0a1119;border:1px solid var(--line);border-radius:8px;padding:9px;color:var(--text);font:inherit;font-size:12px}.decision .btn{margin-top:8px;width:100%}.bottom-note{color:var(--muted);font-size:11px;margin:17px 2px 0}.toast{position:fixed;bottom:20px;left:50%;transform:translate(-50%,20px);background:#e3fff3;color:#10241c;padding:11px 16px;border-radius:10px;font-weight:700;opacity:0;pointer-events:none;transition:.2s;box-shadow:0 10px 35px #0008}.toast.show{opacity:1;transform:translate(-50%,0)}.branch-select{background:#111923;color:var(--text);border:1px solid var(--line);padding:8px;border-radius:8px;max-width:190px}
+@media(max-width:900px){.layout{grid-template-columns:1fr}.stats{grid-template-columns:repeat(2,minmax(0,1fr))}.project-head{align-items:flex-start;flex-direction:column}}@media(max-width:560px){.app{padding:13px}.top{align-items:flex-start}.top-actions .hide-mobile{display:none}.stats{gap:8px}.stat{padding:12px}.stat .value{font-size:21px}.split{grid-template-columns:1fr}.project-head h2{font-size:23px}.brand h1{font-size:16px}}
+</style>
+</head>
+<body>
+<div class="app">
+  <header class="top">
+    <div class="brand"><div class="logo">A</div><div><div class="eyebrow">ArchMind / Design workspace</div><h1>Revision intelligence</h1></div></div>
+    <div class="top-actions"><button class="btn hide-mobile" id="compareBtn">⇄ Compare revisions</button><button class="btn primary" id="reviewBtn">✓ Submit for review</button></div>
+  </header>
+  <section class="project-head">
+    <div><div class="eyebrow">Project / Residential · Hyderabad</div><h2>Courtyard House</h2><div class="sub">Ground floor · Concept design · Last synced 8 minutes ago</div></div>
+    <div class="status">● Design in progress</div>
+  </section>
+  <section class="stats">
+    <div class="stat"><div class="label">Current revision</div><div class="value" id="currentRevision">R13 <span style="font-size:12px;color:var(--green)">↗</span></div><div class="hint">Compared with R12</div></div>
+    <div class="stat"><div class="label">Objects changed</div><div class="value" id="changedCount">4</div><div class="hint">1 geometry · 2 dimensions · 1 annotation</div></div>
+    <div class="stat"><div class="label">Potential impacts</div><div class="value" id="impactCount">3</div><div class="hint">2 need human review</div></div>
+    <div class="stat"><div class="label">Decision coverage</div><div class="value">75%</div><div class="hint">3 of 4 changes linked to a reason</div></div>
+  </section>
+  <section class="layout">
+    <div>
+      <section class="card">
+        <div class="card-head"><h3>Revision history</h3><span class="pill">main / approved baseline R11</span></div>
+        <div class="card-body"><div class="timeline" id="timeline">
+          <button class="revision" data-rev="11"><span class="rnum"><i class="dot"></i>R11</span><strong>Approved baseline</strong><small>Oct 14 · A. Rao</small></button>
+          <button class="revision" data-rev="12"><span class="rnum"><i class="dot"></i>R12</span><strong>Kitchen updated</strong><small>Oct 17 · Prem</small></button>
+          <button class="revision active" data-rev="13"><span class="rnum"><i class="dot"></i>R13</span><strong>Wall adjustment</strong><small>Oct 19 · Prem</small></button>
+          <button class="revision" data-rev="14"><span class="rnum">＋ Draft</span><strong>New design option</strong><small>Not committed</small></button>
+        </div></div>
+      </section>
+      <section class="card" style="margin-top:16px">
+        <div class="card-head"><h3>Visual design diff</h3><div style="display:flex;gap:8px;align-items:center"><select class="branch-select" id="baseSelect" aria-label="Base revision"><option value="12">Base: R12</option><option value="11">Base: R11</option></select><span class="pill" id="headLabel">Head: R13</span></div></div>
+        <div class="card-body">
+          <div class="split">
+            <div class="model"><div class="model-title"><span id="baseTitle">R12 · Previous</span><span>Baseline</span></div>
+              <svg class="plan" viewBox="0 0 320 260" role="img" aria-label="Previous floor plan with kitchen and living room">
+                <defs><pattern id="gridA" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#182633" stroke-width=".7"/></pattern></defs><rect width="320" height="260" fill="url(#gridA)"/>
+                <g fill="#101e29" stroke="#b2c2d2" stroke-width="5" stroke-linejoin="round"><path d="M48 37H272V220H48Z" fill="none"/><path d="M48 127H157M202 127H272" fill="none"/><path d="M157 37V90M157 145V220" fill="none"/></g>
+                <g stroke="#60788d" stroke-width="2" fill="none"><path d="M157 90a35 35 0 0 1 35 35"/><path d="M157 145a35 35 0 0 0 35-35"/><path d="M82 61H134V95H82Z"/><path d="M69 155H119V190H69Z"/><path d="M218 151H253V199H218Z"/></g>
+                <g fill="#c3d2df" font-size="10" font-family="system-ui"><text x="88" y="113">KITCHEN</text><text x="204" y="112">LIVING</text><text x="83" y="210" font-size="8">3000 mm</text></g>
+                <path d="M157 127H202" stroke="#ff8d96" stroke-width="5" stroke-dasharray="4 4"/><text x="162" y="117" fill="#ff8d96" font-size="9">wall</text>
+              </svg>
+            </div>
+            <div class="model"><div class="model-title"><span id="headTitle">R13 · Current</span><span style="color:var(--green)">Changed</span></div>
+              <svg class="plan" viewBox="0 0 320 260" role="img" aria-label="Current floor plan with modified kitchen wall">
+                <defs><pattern id="gridB" width="16" height="16" patternUnits="userSpaceOnUse"><path d="M16 0H0V16" fill="none" stroke="#182633" stroke-width=".7"/></pattern></defs><rect width="320" height="260" fill="url(#gridB)"/>
+                <g fill="#101e29" stroke="#b2c2d2" stroke-width="5" stroke-linejoin="round"><path d="M48 37H272V220H48Z" fill="none"/><path d="M48 127H170M215 127H272" fill="none"/><path d="M170 37V90M170 145V220" fill="none"/></g>
+                <g stroke="#60788d" stroke-width="2" fill="none"><path d="M170 90a35 35 0 0 1 35 35"/><path d="M170 145a35 35 0 0 0 35-35"/><path d="M82 61H134V95H82Z"/><path d="M69 155H119V190H69Z"/><path d="M218 151H253V199H218Z"/></g>
+                <path d="M157 127H170" stroke="#73d7ae" stroke-width="7"/><path d="M157 119V135M170 119V135" stroke="#73d7ae" stroke-width="2"/>
+                <g fill="#c3d2df" font-size="10" font-family="system-ui"><text x="88" y="113">KITCHEN</text><text x="215" y="112">LIVING</text><text x="82" y="210" font-size="8">2700 mm</text></g>
+                <path d="M158 143L169 143" stroke="#73d7ae" stroke-width="2"/><text x="145" y="158" fill="#73d7ae" font-size="9">−300 mm</text>
+              </svg>
+            </div>
+          </div>
+          <div class="legend"><span><i style="background:var(--red)"></i>Previous geometry</span><span><i style="background:var(--green)"></i>Modified geometry</span><span><i style="background:#60788d"></i>Unchanged objects</span></div>
+          <div class="change-list">
+            <div class="eyebrow">Detected changes</div>
+            <div class="change-row"><div class="change-icon">↔</div><div><strong>Wall · Kitchen east (W-102)</strong><p>Length changed from 3,000 mm to 2,700 mm</p></div><span class="delta">−300 mm</span></div>
+            <div class="change-row"><div class="change-icon">⌂</div><div><strong>Room · Kitchen (RM-02)</strong><p>Calculated floor area may have changed</p></div><span class="delta">Recalculate</span></div>
+            <div class="change-row"><div class="change-icon">≋</div><div><strong>Annotation · D-04 clearance</strong><p>Dimension note may no longer match geometry</p></div><span class="delta">Review</span></div>
+            <div class="change-row"><div class="change-icon">＋</div><div><strong>Decision link missing</strong><p>Wall edit has no confirmed reason attached</p></div><button class="mini" id="linkDecision">Link reason</button></div>
+          </div>
+        </div>
+      </section>
+    </div>
+    <aside>
+      <section class="card">
+        <div class="card-head"><h3>Impact review</h3><span class="pill">Rules + graph</span></div>
+        <div class="card-body">
+          <div class="impact-summary"><div class="icon">⚠</div><div><strong>2 items need a designer's attention</strong><p>These are review candidates, not confirmed defects. No AI-generated structural approval.</p></div></div>
+          <div class="finding" data-finding="area"><div class="finding-top"><strong>Kitchen area · RM-02</strong><span class="severity">Check</span></div><p>Recompute room area after the wall moved. Compare against the project brief's minimum area.</p><div class="path">W-102 → bounds → RM-02 → area rule</div><div class="finding-actions"><button class="mini accept" data-action="accept">✓ Mark reviewed</button><button class="mini dismiss" data-action="dismiss">Dismiss</button></div></div>
+          <div class="finding" data-finding="door"><div class="finding-top"><strong>Door clearance · D-04</strong><span class="severity">Check</span></div><p>Verify the dimension annotation and clear opening remain consistent with the updated geometry.</p><div class="path">W-102 → adjacent opening → D-04</div><div class="finding-actions"><button class="mini accept" data-action="accept">✓ Mark reviewed</button><button class="mini dismiss" data-action="dismiss">Dismiss</button></div></div>
+          <div class="finding" data-finding="quantity"><div class="finding-top"><strong>Material quantity estimate</strong><span class="severity" style="color:var(--blue)">Info</span></div><p>Wall length changed by 0.3 m. Recalculate dependent finish quantities if this wall is in scope.</p><div class="path">W-102 → material takeoff</div><div class="finding-actions"><button class="mini accept" data-action="accept">✓ Mark reviewed</button><button class="mini dismiss" data-action="dismiss">Dismiss</button></div></div>
+          <div class="decision"><label for="decisionReason">Decision memory · Why was this changed?</label><textarea id="decisionReason" placeholder="Add a client request, meeting note, or design rationale…"></textarea><button class="btn" id="saveReason">Save decision note</button></div>
+        </div>
+      </section>
+      <p class="bottom-note">Prototype data only. Geometry, relationships, impact findings and approval actions are illustrative; no CAD files are read or changed.</p>
+    </aside>
+  </section>
+</div>
+<div class="toast" id="toast" role="status" aria-live="polite"></div>
+<script>
+(function(){
+  const toastEl=document.getElementById('toast');let toastTimer;
+  function toast(message){toastEl.textContent=message;toastEl.classList.add('show');clearTimeout(toastTimer);toastTimer=setTimeout(()=>toastEl.classList.remove('show'),2400)}
+  const revisionData={11:{title:'R11 · Approved',base:'11',count:'0',impacts:'0',note:'Approved baseline'},12:{title:'R12 · Previous',base:'12',count:'2',impacts:'1',note:'Kitchen updated'},13:{title:'R13 · Current',base:'12',count:'4',impacts:'3',note:'Wall adjustment'},14:{title:'Draft · Option B',base:'13',count:'1',impacts:'2',note:'New design option'}};
+  document.querySelectorAll('.revision').forEach(button=>button.addEventListener('click',()=>{
+    const rev=Number(button.dataset.rev);document.querySelectorAll('.revision').forEach(el=>el.classList.toggle('active',el===button));
+    document.getElementById('currentRevision').textContent=rev===14?'Draft B':'R'+rev;
+    document.getElementById('changedCount').textContent=revisionData[rev].count;
+    document.getElementById('impactCount').textContent=revisionData[rev].impacts;
+    document.getElementById('headLabel').textContent=rev===14?'Head: Draft B':'Head: R'+rev;
+    document.getElementById('headTitle').textContent=revisionData[rev].title;
+    toast('Selected '+revisionData[rev].note+' · illustrative preview');
+  }));
+  document.getElementById('baseSelect').addEventListener('change',e=>{document.getElementById('baseTitle').textContent='R'+e.target.value+' · Previous';toast('Comparison base changed to R'+e.target.value)});
+  document.getElementById('compareBtn').addEventListener('click',()=>{document.querySelector('.card').scrollIntoView({behavior:'smooth',block:'start'});toast('Choose a base revision to compare')});
+  document.getElementById('reviewBtn').addEventListener('click',()=>toast('Prototype only: review submission is not connected to a backend'));
+  document.getElementById('linkDecision').addEventListener('click',()=>{document.getElementById('decisionReason').focus();toast('Add the source or rationale, then save it')});
+  document.getElementById('saveReason').addEventListener('click',()=>{const value=document.getElementById('decisionReason').value.trim();if(!value){toast('Add a reason before saving');return}toast('Decision note captured in this prototype only')});
+  document.querySelectorAll('[data-action]').forEach(button=>button.addEventListener('click',()=>{const row=button.closest('.finding');if(button.dataset.action==='dismiss'){row.style.opacity='.45';row.dataset.status='dismissed';toast('Finding dismissed in this prototype')}else{row.style.opacity='.65';row.dataset.status='reviewed';button.textContent='✓ Reviewed';button.disabled=true;toast('Finding marked reviewed in this prototype')}}));
+})();
+</script>
+</body>
+</html>
