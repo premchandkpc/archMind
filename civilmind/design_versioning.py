@@ -78,6 +78,12 @@ class DesignSnapshot:
         if len(ids) != len(set(ids)):
             raise ValueError(f"duplicate object_id in revision {self.revision_id!r}")
         known = set(ids)
+        edge_keys = [
+            (edge.source_id, edge.target_id, edge.relation_type, edge.provenance)
+            for edge in self.relationships
+        ]
+        if len(edge_keys) != len(set(edge_keys)):
+            raise ValueError(f"duplicate relationship in revision {self.revision_id!r}")
         for edge in self.relationships:
             if edge.source_id not in known or edge.target_id not in known:
                 raise ValueError(
