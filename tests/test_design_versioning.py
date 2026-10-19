@@ -6,6 +6,7 @@ import math
 
 import pytest
 
+from civilmind.api.routes.design_revisions import AnalyzeRevisionRequest, analyze_revision
 from civilmind.design_versioning import (
     DesignObject,
     DesignSnapshot,
@@ -199,3 +200,69 @@ def test_rule_engine_ignores_non_numeric_area_values() -> None:
     )
 
     assert evaluate_minimum_rules(snapshot, minimum_room_area_sqm=10.0) == []
+
+
+
+@pytest.mark.asyncio
+async def test_analysis_endpoint_returns_diff_impacts_and_rule_evidence() -> None:
+    request = AnalyzeRevisionRequest.model_validate(
+        {
+            "base": {
+                "revision_id": "R1",
+                "objects": [
+                    {"object_id": "wall-1", "kind": "wall", "properties": {"length_mm": 3000}},
+                    {"object_id": "room-1", "kind": "room", "properties": {"area_sqm": 7.5}},
+                    {"object_id": "door-1", "kind": "door", "properties": {"width_mm": 750}},
+                ],
+                "relationships": [
+                    {
+                        "source_id": "wall-1",
+                        "target_id": "room-1",
+                        "relation_type": "bounds",
+                        "provenance": "ifc",
+                    },
+                    {
+                        "source_id": "room-1",
+                        "target_id": "door-1",
+                        "relation_type": "contains",
+                        "provenance": "ifc",
+                    },
+                ],
+            },
+            "head": {
+                "revision_id": "R2",
+                "objects": [
+                    {"object_id": "wall-1", "kind": "wall", "properties": {"length_mm": 2700}},
+                    {"object_id": "room-1", "kind": "room", "properties": {"area_sqm": 7.5}},
+                    {"object_id": "door-1", "kind": "door", "properties": {"width_mm": 750}},
+                ],
+                "relationships": [
+                    {
+                        "source_id": "wall-1",
+                        "target_id": "room-1",
+                        "relation_type": "bounds",
+                        "provenance": "ifc",
+                    },
+                    {
+                        "source_id": "room-1",
+                        "target_id": "door-1",
+                        "relation_type": "contains",
+                        "provenance": "ifc",
+                    },
+                ],
+            },
+            "minimum_room_area_sqm": 9.0,
+            "minimum_door_width_mm": 800.0,
+        }
+    )
+
+    result = await analyze_revision(request)
+
+    assert result["base_revision_id"] == "R1"
+    assert result["head_revision_id"] == "R2"
+    assert result["changes"][0]["object_id"] == "wall-1"
+    assert [item["object_id"] for item in result["impacts"]] == ["room-1", "door-1"]
+    assert [item["rule_id"] for item in result["rule_findings"]] == [
+        "door.minimum_width",
+        "room.minimum_area",
+    ]
