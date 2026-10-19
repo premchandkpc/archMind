@@ -5,7 +5,9 @@ from __future__ import annotations
 from dataclasses import asdict
 
 from fastapi import APIRouter, HTTPException
-from pydantic import BaseModel, ConfigDict, Field
+from math import isfinite
+
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from civilmind.design_versioning import (
     DesignObject,
@@ -21,6 +23,29 @@ from civilmind.design_versioning import (
 router = APIRouter(prefix="/design-revisions", tags=["design-revisions"])
 
 
+def _validate_json_numbers(value: object, path: str = "properties") -> None:
+    """Reject non-finite floats and integers outside signed 64-bit range."""
+    if isinstance(value, bool) or value is None or isinstance(value, str):
+        return
+    if isinstance(value, float):
+        if not isfinite(value):
+            raise ValueError(f"{path} must not contain NaN or Infinity")
+        return
+    if isinstance(value, int):
+        if not -(2**63) <= value <= 2**63 - 1:
+            raise ValueError(f"{path} contains an integer outside the signed 64-bit range")
+        return
+    if isinstance(value, list):
+        for index, item in enumerate(value):
+            _validate_json_numbers(item, f"{path}[{index}]")
+        return
+    if isinstance(value, dict):
+        for key, item in value.items():
+            _validate_json_numbers(item, f"{path}.{key}")
+        return
+    raise ValueError(f"{path} contains a non-JSON value")
+
+
 class DesignObjectPayload(BaseModel):
     """Adapter-normalized object in a submitted revision."""
 
@@ -29,8 +54,15 @@ class DesignObjectPayload(BaseModel):
     object_id: str = Field(min_length=1, max_length=512)
     kind: str = Field(min_length=1, max_length=128)
     properties: dict[str, JsonValue] = Field(default_factory=dict)
+
+    @field_validator("properties", mode="before")
+    @classmethod
+    def validate_property_numbers(cls, value: object) -> object:
+        _validate_json_numbers(value)
+        return value
+
     source_id: str | None = Field(default=None, max_length=512)
-    confidence: float = Field(default=1.0, ge=0.0, le=1.0)
+    confidence: float = Field(default=1.0, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 class RelationshipPayload(BaseModel):
@@ -62,10 +94,10 @@ class AnalyzeRevisionRequest(BaseModel):
 
     base: SnapshotPayload
     head: SnapshotPayload
-    minimum_room_area_sqm: float | None = Field(default=None, ge=0.0)
-    minimum_door_width_mm: float | None = Field(default=None, ge=0.0)
+    minimum_room_area_sqm: float | None = Field(default=None, ge=0.0, allow_inf_nan=False)
+    minimum_door_width_mm: float | None = Field(default=None, ge=0.0, allow_inf_nan=False)
     max_impact_depth: int = Field(default=3, ge=0, le=10)
-    min_relationship_confidence: float = Field(default=0.0, ge=0.0, le=1.0)
+    min_relationship_confidence: float = Field(default=0.0, ge=0.0, le=1.0, allow_inf_nan=False)
 
 
 def _to_snapshot(payload: SnapshotPayload) -> DesignSnapshot:
