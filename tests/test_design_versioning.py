@@ -114,6 +114,16 @@ def test_relationship_diff_includes_add_remove_and_confidence_update() -> None:
     assert changes[1].after_confidence == 0.7
 
 
+def test_duplicate_relationships_are_rejected() -> None:
+    edge = Relationship("wall-1", "room-1", "bounds", "ifc")
+    with pytest.raises(ValueError, match="duplicate relationship"):
+        DesignSnapshot(
+            "R1",
+            (DesignObject("wall-1", "wall"), DesignObject("room-1", "room")),
+            (edge, edge),
+        )
+
+
 def test_impact_graph_is_cycle_safe_and_respects_max_depth() -> None:
     relationships = (
         Relationship("wall-1", "room-1", "bounds", "ifc"),
