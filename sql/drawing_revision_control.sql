@@ -65,7 +65,8 @@ CREATE TABLE drawing_outbox (
 -- concurrent issue attempts; the partial unique index remains the final invariant.
 CREATE OR REPLACE FUNCTION issue_sheet_revision(
     p_revision_id UUID,
-    p_actor_id UUID
+    p_actor_id UUID,
+    p_expected_current_revision_id UUID
 ) RETURNS VOID
 LANGUAGE plpgsql
 AS $$
@@ -76,6 +77,7 @@ DECLARE
     v_status TEXT;
     v_author_id UUID;
     v_approved_by UUID;
+    v_current_issued_id UUID;
 BEGIN
     SELECT sr.sheet_id, ds.tenant_id, ds.project_id, sr.status,
            sr.author_id, sr.approved_by
@@ -89,6 +91,15 @@ BEGIN
     IF NOT FOUND THEN
         RAISE EXCEPTION 'revision % not found', p_revision_id
             USING ERRCODE = 'P0002';
+    END IF;
+    SELECT id INTO v_current_issued_id
+      FROM sheet_revision
+     WHERE sheet_id = v_sheet_id AND status = 'issued'
+     FOR UPDATE;
+
+    IF v_current_issued_id IS DISTINCT FROM p_expected_current_revision_id THEN
+        RAISE EXCEPTION 'current issued revision changed; reload history and retry'
+            USING ERRCODE = 'serialization_failure';
     END IF;
     IF v_status <> 'approved' THEN
         RAISE EXCEPTION 'only approved revisions can be issued'
