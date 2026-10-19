@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import hashlib
 from io import BytesIO
 from pathlib import Path
 
@@ -47,14 +48,14 @@ async def inspect_drawing_pdf(file: UploadFile = File(...)) -> dict[str, object]
             extracted = page.extract_text() or ""
             result = parse_title_block_text(extracted)
             pages.append({"page_number": index, **result.to_dict()})
-    except PdfReadError as exc:
+    except (PdfReadError, ValueError) as exc:
         raise HTTPException(status_code=422, detail="Could not read the PDF file.") from exc
 
     matched = sum(page["status"] == "matched" for page in pages)
     return {
         "filename": filename,
         "file_size_bytes": len(contents),
-        "sha256": __import__("hashlib").sha256(contents).hexdigest(),
+        "sha256": hashlib.sha256(contents).hexdigest(),
         "page_count": page_count,
         "matched_pages": matched,
         "unmatched_pages": page_count - matched,
