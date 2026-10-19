@@ -8,7 +8,7 @@ from __future__ import annotations
 
 from collections import deque
 from dataclasses import dataclass, field
-from math import isfinite
+from math import isfinite, isnan
 from typing import TypeAlias
 
 from typing_extensions import TypeAliasType
@@ -147,6 +147,21 @@ class RuleFinding:
     evidence: dict[str, JsonValue]
 
 
+def _json_values_equal(left: JsonValue, right: JsonValue) -> bool:
+    """Compare JSON-like values while treating two NaNs as the same invalid value."""
+    if isinstance(left, float) and isinstance(right, float) and isnan(left) and isnan(right):
+        return True
+    if isinstance(left, list) and isinstance(right, list):
+        return len(left) == len(right) and all(
+            _json_values_equal(a, b) for a, b in zip(left, right, strict=True)
+        )
+    if isinstance(left, dict) and isinstance(right, dict):
+        return left.keys() == right.keys() and all(
+            _json_values_equal(left[key], right[key]) for key in left
+        )
+    return type(left) is type(right) and left == right
+
+
 def compare_snapshots(base: DesignSnapshot, head: DesignSnapshot) -> list[DesignChange]:
     """Return a stable semantic diff between two revisions.
 
@@ -180,7 +195,7 @@ def compare_snapshots(base: DesignSnapshot, head: DesignSnapshot) -> list[Design
             after_present = name in new.properties
             before_value = old.properties.get(name)
             after_value = new.properties.get(name)
-            if before_present != after_present or before_value != after_value:
+            if before_present != after_present or not _json_values_equal(before_value, after_value):
                 changed[name] = PropertyChange(
                     before=before_value,
                     after=after_value,
@@ -334,7 +349,7 @@ def evaluate_minimum_rules(
         if normalized_kind == "room" and minimum_room_area_sqm is not None:
             area = obj.properties.get("area_sqm")
             if isinstance(area, (int, float)) and not isinstance(area, bool):
-                if not isfinite(float(area)):
+                if isinstance(area, float) and not isfinite(area):
                     continue
                 if area < minimum_room_area_sqm:
                     findings.append(
@@ -356,7 +371,7 @@ def evaluate_minimum_rules(
         elif normalized_kind == "door" and minimum_door_width_mm is not None:
             width = obj.properties.get("width_mm")
             if isinstance(width, (int, float)) and not isinstance(width, bool):
-                if not isfinite(float(width)):
+                if isinstance(width, float) and not isfinite(width):
                     continue
                 if width < minimum_door_width_mm:
                     findings.append(
