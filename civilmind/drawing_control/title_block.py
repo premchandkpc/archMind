@@ -84,7 +84,7 @@ def parse_title_block_text(text: str) -> TitleBlockResult:
             ("revision_label", revision_candidates),
         )
         if not candidates
-    )
+    ) + (("project_name",) if not project_name else ())
     ambiguous = tuple(
         name
         for name, candidates in (
