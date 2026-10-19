@@ -113,7 +113,7 @@ async def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]
     # existed before the edit. The result is a candidate impact list, not a guarantee.
     relationships = tuple(dict.fromkeys((*base.relationships, *head.relationships)))
     impacts = ImpactGraph(relationships).impacted(
-        changed_ids,
+        sorted(changed_ids),
         max_depth=request.max_impact_depth,
         min_confidence=request.min_relationship_confidence,
     )
