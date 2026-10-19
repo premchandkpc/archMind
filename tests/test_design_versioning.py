@@ -93,6 +93,7 @@ def test_relationship_diff_includes_add_remove_and_confidence_update() -> None:
         (DesignObject("wall-1", "wall"), DesignObject("room-1", "room")),
         (
             Relationship("wall-1", "room-1", "bounds", "ifc", 1.0),
+            Relationship("room-1", "wall-1", "near", "legacy", 0.5),
         ),
     )
     head = DesignSnapshot(
@@ -107,11 +108,12 @@ def test_relationship_diff_includes_add_remove_and_confidence_update() -> None:
     changes = compare_relationships(base, head)
 
     assert [(item.operation, item.relation_type) for item in changes] == [
+        ("removed", "near"),
         ("added", "affects"),
         ("updated", "bounds"),
     ]
-    assert changes[1].before_confidence == 1.0
-    assert changes[1].after_confidence == 0.7
+    assert changes[2].before_confidence == 1.0
+    assert changes[2].after_confidence == 0.7
 
 
 def test_duplicate_relationships_are_rejected() -> None:
