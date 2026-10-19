@@ -4,8 +4,9 @@ from __future__ import annotations
 
 from dataclasses import asdict
 
-from fastapi import APIRouter, HTTPException
 from math import isfinite
+
+from fastapi import APIRouter, HTTPException
 
 from pydantic import BaseModel, ConfigDict, Field, field_validator
 
