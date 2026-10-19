@@ -92,11 +92,13 @@ def create_app() -> FastAPI:
         logger.error("Internal server error", error=str(exc))
         return JSONResponse(status_code=500, content={"detail": "Internal server error"})
 
+    from civilmind.api.routes.design_revisions import router as design_revisions_router
     from civilmind.api.routes.health import router as health_router
     from civilmind.api.routes.upload import router as upload_router
 
     app.include_router(health_router)
     app.include_router(upload_router)
+    app.include_router(design_revisions_router)
 
     return app
 
