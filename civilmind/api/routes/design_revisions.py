@@ -99,7 +99,7 @@ def _to_snapshot(payload: SnapshotPayload) -> DesignSnapshot:
 
 
 @router.post("/analyze")
-async def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]:
+def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]:
     """Compare two normalized snapshots and return evidence-backed candidates."""
     base = _to_snapshot(request.base)
     head = _to_snapshot(request.head)
