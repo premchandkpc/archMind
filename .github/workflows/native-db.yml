@@ -1,0 +1,40 @@
+name: CivilMind Native DB
+
+on:
+  push:
+    branches: [main, "feat/civilmind-go-native-db"]
+    paths:
+      - "native-db/**"
+      - ".github/workflows/native-db.yml"
+  pull_request:
+    paths:
+      - "native-db/**"
+      - ".github/workflows/native-db.yml"
+
+permissions:
+  contents: read
+
+jobs:
+  go-test:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: native-db
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-go@v5
+        with:
+          go-version: "1.22.x"
+          cache-dependency-path: native-db/go.mod
+      - name: Verify Go formatting
+        run: |
+          files="$(gofmt -l $(find . -name '*.go' -type f))"
+          if [ -n "$files" ]; then
+            echo "These Go files require gofmt:"
+            echo "$files"
+            exit 1
+          fi
+      - name: Test
+        run: go test -race ./...
+      - name: Vet
+        run: go vet ./...

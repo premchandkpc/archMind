@@ -14,6 +14,12 @@ Not a RAG chatbot. A production AI platform with:
 - **Evaluation** — faithfulness scoring, hallucination detection, retrieval metrics, cost tracking
 - **Observability** — structured logs, Prometheus metrics, OpenTelemetry traces
 
+## CivilMind Native DB prototype
+
+A standalone Go storage-engine prototype lives in `native-db/`. It has its own checksummed append-only WAL, rebuildable BM25-like inverted index, exact cosine vector search, metadata/project filtering, RRF ranking, and source-evidence records. It does not use PostgreSQL or Qdrant for its chunk retrieval path. This is an experimental single-node engine, not yet integrated into ingestion or a replacement for CivilMind business metadata. See [native-db/README.md](native-db/README.md).
+
+Configure `CIVILMIND_DB_DATA_DIR`, `CIVILMIND_DB_ADDR`, and a strong `CIVILMIND_DB_TOKEN` in `.env`, then use `make native-db-test`, `make native-db-vet`, and `make native-db-run`.
+
 ## Architecture
 
 See [ARCHITECTURE.md](ARCHITECTURE.md) for:
