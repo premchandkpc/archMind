@@ -1,4 +1,16 @@
-# AI Knowledge Platform
+# ArchMind
+
+**PDF-first drawing revision control for construction teams.** ArchMind helps teams identify the current issued drawing, understand what changed between revisions, and preserve who approved it and why. It is a neutral workflow layer, not a replacement for AutoCAD, Revit, or Bluebeam.
+
+The first wedge is drawing-set control: PDF title-block identification, visual revision comparison, human-reviewed matching, and a trustworthy issue history. Native CAD/BIM semantics are later-stage integrations, not the MVP entry point.
+
+- [Drawing control mock](docs/drawing-control/mock.html)
+- [PDF-first MVP and validation plan](docs/drawing-control/README.md)
+- [Drawing revision database schema](sql/drawing_revision_control.sql)
+
+> Current implementation boundary: `POST /drawing-revisions/inspect` extracts text from PDF pages and returns explicit title-block candidates. It does not persist or issue revisions. Scanned pages and ambiguous title blocks are marked unmatched for human review.
+
+---
 
 Domain-agnostic AI platform for document intelligence, multi-agent reasoning, and knowledge graph-powered question answering. Civil engineering is one plugin. The core engine is reusable across legal, medical, finance, and manufacturing.
 
