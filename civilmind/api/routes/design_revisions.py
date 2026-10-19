@@ -3,8 +3,6 @@
 from __future__ import annotations
 
 from dataclasses import asdict
-from typing import Literal
-
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel, ConfigDict, Field
 
@@ -14,6 +12,7 @@ from civilmind.design_versioning import (
     ImpactGraph,
     JsonValue,
     Relationship,
+    compare_relationships,
     compare_snapshots,
     evaluate_minimum_rules,
 )
@@ -104,7 +103,11 @@ async def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]
     base = _to_snapshot(request.base)
     head = _to_snapshot(request.head)
     changes = compare_snapshots(base, head)
-    changed_ids = [change.object_id for change in changes]
+    relationship_changes = compare_relationships(base, head)
+    changed_ids = {change.object_id for change in changes}
+    for change in relationship_changes:
+        changed_ids.add(change.source_id)
+        changed_ids.add(change.target_id)
 
     # Include both revision edge sets so removals can still surface dependencies that
     # existed before the edit. The result is a candidate impact list, not a guarantee.
@@ -124,6 +127,7 @@ async def analyze_revision(request: AnalyzeRevisionRequest) -> dict[str, object]
         "base_revision_id": base.revision_id,
         "head_revision_id": head.revision_id,
         "changes": [asdict(change) for change in changes],
+        "relationship_changes": [asdict(change) for change in relationship_changes],
         "impacts": [asdict(impact) for impact in impacts],
         "rule_findings": [asdict(finding) for finding in findings],
         "limitations": [
