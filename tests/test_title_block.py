@@ -80,3 +80,12 @@ def test_conflicting_revision_candidates_require_human_review() -> None:
     assert result.revision_label is None
     assert result.candidate_revision_labels == ("R4", "R5")
     assert result.ambiguous_fields == ("revision_label",)
+
+
+
+def test_revision_text_placeholder_is_not_accepted_as_a_candidate() -> None:
+    result = parse_title_block_text("Sheet No: A101\nRevision: Not Applicable")
+
+    assert result.status == "unmatched"
+    assert result.candidate_revision_labels == ()
+    assert result.revision_label is None
