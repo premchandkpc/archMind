@@ -12,7 +12,6 @@ from typing import Iterable
 
 SHEET_PATTERNS = (
     re.compile(r"\b(?:sheet\s*(?:no\.?|number|#)?|drawing\s*(?:no\.?|number|#))\s*[:#-]?\s*([A-Z]{1,5}[-.]?\d{1,5}(?:\.\d{1,3})?)\b", re.I),
-    re.compile(r"\b([A-Z]{1,3}\d{2,4})\b"),
 )
 REVISION_PATTERN = re.compile(r"\b(?:revision|rev\.?|issue\s*rev\.?)\s*[:#-]?\s*([A-Z]{1,2}\d{0,3}|\d{1,3}|[A-Z]{1,3})\b", re.I)
 PROJECT_PATTERN = re.compile(r"\bproject\s*(?:name|title)?\s*[:#-]\s*([^\r\n]{2,100})", re.I)
