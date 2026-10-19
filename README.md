@@ -1,104 +1,78 @@
 # ArchMind
 
-**PDF-first drawing revision control for construction teams.** ArchMind helps teams identify the current issued drawing, understand what changed between revisions, and preserve who approved it and why. It is a neutral workflow layer, not a replacement for AutoCAD, Revit, or Bluebeam.
+**PDF-first drawing revision control for construction teams.**
 
-The first wedge is drawing-set control: PDF title-block identification, visual revision comparison, human-reviewed matching, and a trustworthy issue history. Native CAD/BIM semantics are later-stage integrations, not the MVP entry point.
+ArchMind helps construction teams answer four questions without guessing:
 
-- [Drawing control mock](docs/drawing-control/mock.html)
-- [PDF-first MVP and validation plan](docs/drawing-control/README.md)
-- [Drawing revision database schema](sql/drawing_revision_control.sql)
+1. **Which drawing is current?**
+2. What changed from the previous revision?
+3. Who approved the change?
+4. Why was it issued?
 
-> Current implementation boundary: `POST /drawing-revisions/inspect` extracts text from PDF pages and returns explicit title-block candidates. It does not persist or issue revisions. Scanned pages and ambiguous title blocks are marked unmatched for human review.
+ArchMind is a neutral drawing-set control and audit layer. It is not a replacement for AutoCAD, Revit, or Bluebeam.
 
----
+## What works today
 
-Domain-agnostic AI platform for document intelligence, multi-agent reasoning, and knowledge graph-powered question answering. Civil engineering is one plugin. The core engine is reusable across legal, medical, finance, and manufacturing.
+- **PDF inspection API:** `POST /drawing-revisions/inspect` accepts a PDF and extracts text from its pages.
+- **Title-block candidates:** identifies explicitly labelled sheet, revision, and project fields.
+- **Conservative matching:** missing, conflicting, or ambiguous fields are returned for human review rather than silently guessed.
+- **Source hash:** returns a SHA-256 hash for the inspected PDF.
+- **Focused tests and CI:** parser and API boundary tests run in the drawing-control workflow.
 
-## What this is
+The inspection endpoint **does not persist uploads, create a revision record, approve a drawing, or issue it**. The database schema is a proposal, not a deployed migration. PDF text extraction does not read scanned pages without a text layer; those need an OCR path or manual handling.
 
-Not a RAG chatbot. A production AI platform with:
+## Product workflow
 
-- **LangGraph orchestration** — stateful workflows with checkpointing, conditional routing, human-in-the-loop
-- **Tool layer** — agents never query databases directly; Strategy pattern makes tools swappable and testable
-- **Event-driven ingestion** — async pipeline: Upload → Parse → Chunk → Embed → Graph → Index
-- **Hybrid RAG** — BM25 + Vector + GraphRAG with RRF fusion and cross-encoder reranking
-- **Knowledge graphs** — Neo4j for multi-hop reasoning: `Entity → Relationship → Entity`
-- **Evaluation** — faithfulness scoring, hallucination detection, retrieval metrics, cost tracking
-- **Observability** — structured logs, Prometheus metrics, OpenTelemetry traces
-
-## CivilMind Native DB prototype
-
-A standalone Go storage-engine prototype lives in `native-db/`. It has its own checksummed append-only WAL, rebuildable BM25-like inverted index, exact cosine vector search, metadata/project filtering, RRF ranking, and source-evidence records. It does not use PostgreSQL or Qdrant for its chunk retrieval path. This is an experimental single-node engine, not yet integrated into ingestion or a replacement for CivilMind business metadata. See [native-db/README.md](native-db/README.md).
-
-Configure `CIVILMIND_DB_DATA_DIR`, `CIVILMIND_DB_ADDR`, and a strong `CIVILMIND_DB_TOKEN` in `.env`, then use `make native-db-test`, `make native-db-vet`, and `make native-db-run`.
-
-## Architecture
-
-See [ARCHITECTURE.md](ARCHITECTURE.md) for:
-- System architecture diagram
-- Request lifecycle (query + ingestion)
-- Domain model
-- Data flow
-- Deployment architecture (Docker Compose → Kubernetes)
-- Key design decisions
-
-## Module structure
-
-```
-civilmind/
-├── api/                    # FastAPI HTTP layer
-├── domain/                 # Business logic (pure Python)
-├── infrastructure/         # External integrations (DB, storage, cache, observability)
-├── workflow/               # LangGraph orchestration
-├── agents/                 # CrewAI worker agents
-├── tools/                  # Tool layer (Strategy pattern)
-├── retrieval/              # Hybrid RAG + GraphRAG
-├── vision/                 # OCR + floor plan analysis
-├── knowledge_graph/        # Neo4j graph operations
-├── pipeline/               # Ingestion pipeline
-├── events/                 # Event-driven processing (Redis Streams)
-├── evaluation/             # Quality framework
-├── config.py               # Design decisions
-└── settings.py             # Deployment facts
+```text
+Upload PDF
+   → inspect sheet and revision candidates
+   → human confirms or corrects metadata
+   → save revision and source file
+   → approve with separation of duties
+   → issue atomically (one current issued revision per sheet)
+   → compare with previous revision
+   → append an auditable decision history
 ```
 
-## Setup
+The MVP should prefer a human-review queue over a confident-looking wrong match. A duplicate file hash should be idempotent, and a second attempt to issue a conflicting revision must be rejected.
 
-```bash
-pip install -e ".[dev]"
-cp .env.example .env  # fill in credentials
-uvicorn civilmind.api.app:app --reload
-```
+## Start here
 
-**Required env vars** (app won't start without these):
+- [Drawing-control prototype](docs/drawing-control/mock.html)
+- [MVP scope, validation plan, and production gates](docs/drawing-control/README.md)
+- [Proposed drawing-revision schema](sql/drawing_revision_control.sql)
 
-| Variable | Purpose |
-|----------|---------|
-| `OPENCODE_API_KEY` | OpenCode Zen API key |
-| `LLM_MODEL` | e.g. `opencode/claude-sonnet-4-5` |
-| `VISION_MODEL` | e.g. `opencode/gpt-5` |
-| `EMBEDDING_MODEL` | Must exist in `config.py EMBEDDING_DIMS` |
+## Stack today
 
-## Implementation status
+- **API:** Python and FastAPI
+- **PDF text extraction:** pypdf
+- **Tests:** pytest and Ruff
+- **Target persistence:** PostgreSQL for metadata, revision state, and audit records; object storage such as S3 for source PDFs
+- **Current persistence status:** not implemented in the inspection endpoint
 
-| Phase | Chunks | Status |
-|-------|--------|--------|
-| 0. Architecture | ARCHITECTURE.md | Done |
-| 1. Foundation | 1.1 ✓ 1.2 ✓ 1.3 ✓ 1.4 1.5 1.6 | 3/6 |
-| 2. Tool Layer | 2.1 2.2 2.3 2.4 2.5 | 0/5 |
-| 3. Ingestion | 3.1 3.2 3.3 3.4 | 0/4 |
-| 4. Retrieval | 4.1 4.2 4.3 | 0/3 |
-| 5. LangGraph | 5.1 5.2 5.3 | 0/3 |
-| 6. Agents | 6.1 6.2 | 0/2 |
-| 7. Vision | 7.1 7.2 7.3 | 0/3 |
-| 8. Knowledge Graph | 8.1 8.2 | 0/2 |
-| 9. Evaluation | 9.1 9.2 9.3 | 0/3 |
-| 10. API + Deploy | 10.1 10.2 10.3 10.4 | 0/4 |
+PostgreSQL and object storage are the intended MVP baseline. Additional databases, queues, graph systems, and agent frameworks are not part of the drawing-control critical path unless a demonstrated requirement justifies them.
 
-**Total: 3/34 chunks complete.**
+## What comes next
 
-See [PLAN.md](PLAN.md) for detailed specs. See [plan/](plan/) for per-chunk implementation plans.
+1. Add a PostgreSQL migration and persist uploaded-file metadata and revision records; store the PDF in object storage.
+2. Build a human review inbox to confirm or correct sheet and revision values.
+3. Implement approval and transactional issue semantics, including four-eyes separation and one current issued revision per sheet.
+4. Add visual comparison and an append-only audit history.
+5. Validate the workflow with real drawing sets and a small group of construction users.
+
+Success is measured by whether a team can reliably identify the current issued sheet and reconstruct who approved it and why, not by the number of infrastructure components in the diagram.
+
+## Experiments outside the MVP
+
+This repository also contains earlier AI-platform and native-database experiments. They are **learning/prototype work, not dependencies of the current drawing-control workflow**. Keep them isolated from the MVP, and do not add their infrastructure to the product path without evidence from users or measurements.
+
+- [Native DB prototype](native-db/README.md): standalone Go storage-engine experiment, not the drawing-control persistence layer.
+- [Earlier platform architecture](ARCHITECTURE.md) and [implementation plan](PLAN.md): historical platform work, not the current product roadmap.
+
+## Development
+
+For the current Python package and environment setup, see [pyproject.toml](pyproject.toml) and the drawing-control workflow. The focused CI workflow currently covers the PDF parser and inspection API; it does not establish that the full repository passes all tests or that the PostgreSQL issue transaction is production-ready.
 
 ## License
 
-TBD
+No license has been selected yet. Until one is added, the repository should be treated as all-rights-reserved; do not assume that public visibility grants permission to reuse the code.
