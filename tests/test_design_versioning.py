@@ -203,8 +203,7 @@ def test_rule_engine_ignores_non_numeric_area_values() -> None:
 
 
 
-@pytest.mark.asyncio
-async def test_analysis_endpoint_returns_diff_impacts_and_rule_evidence() -> None:
+def test_analysis_endpoint_returns_diff_impacts_and_rule_evidence() -> None:
     request = AnalyzeRevisionRequest.model_validate(
         {
             "base": {
@@ -256,13 +255,20 @@ async def test_analysis_endpoint_returns_diff_impacts_and_rule_evidence() -> Non
         }
     )
 
-    result = await analyze_revision(request)
+    result = analyze_revision(request)
 
     assert result["base_revision_id"] == "R1"
     assert result["head_revision_id"] == "R2"
-    assert result["changes"][0]["object_id"] == "wall-1"
-    assert [item["object_id"] for item in result["impacts"]] == ["room-1", "door-1"]
-    assert [item["rule_id"] for item in result["rule_findings"]] == [
+    changes = result["changes"]
+    impacts = result["impacts"]
+    findings = result["rule_findings"]
+    assert isinstance(changes, list)
+    assert isinstance(impacts, list)
+    assert isinstance(findings, list)
+    assert isinstance(changes[0], dict)
+    assert changes[0]["object_id"] == "wall-1"
+    assert [item["object_id"] for item in impacts] == ["room-1", "door-1"]
+    assert [item["rule_id"] for item in findings] == [
         "door.minimum_width",
         "room.minimum_area",
     ]
