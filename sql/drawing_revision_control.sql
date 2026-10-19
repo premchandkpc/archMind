@@ -77,12 +77,15 @@ DECLARE
     v_status TEXT;
     v_author_id UUID;
     v_approved_by UUID;
+    v_decision_id UUID;
+    v_file_hash CHAR(64);
+    v_revision_label TEXT;
     v_current_issued_id UUID;
 BEGIN
     SELECT sr.sheet_id, ds.tenant_id, ds.project_id, sr.status,
-           sr.author_id, sr.approved_by
+           sr.author_id, sr.approved_by, sr.decision_id, sr.file_hash, sr.revision_label
       INTO v_sheet_id, v_tenant_id, v_project_id, v_status,
-           v_author_id, v_approved_by
+           v_author_id, v_approved_by, v_decision_id, v_file_hash, v_revision_label
       FROM sheet_revision sr
       JOIN drawing_sheet ds ON ds.id = sr.sheet_id
      WHERE sr.id = p_revision_id
@@ -103,6 +106,10 @@ BEGIN
     END IF;
     IF v_status <> 'approved' THEN
         RAISE EXCEPTION 'only approved revisions can be issued'
+            USING ERRCODE = 'check_violation';
+    END IF;
+    IF v_decision_id IS NULL THEN
+        RAISE EXCEPTION 'revision requires a decision reference before issuance'
             USING ERRCODE = 'check_violation';
     END IF;
     IF v_approved_by IS NULL OR v_approved_by = v_author_id THEN
@@ -127,9 +134,11 @@ BEGIN
     ) VALUES (
         v_tenant_id, v_project_id, v_sheet_id, p_revision_id, p_actor_id,
         'revision.issued',
-        jsonb_build_object('revision_label', (
-            SELECT revision_label FROM sheet_revision WHERE id = p_revision_id
-        ))
+        jsonb_build_object(
+            'revision_label', v_revision_label,
+            'file_hash', v_file_hash,
+            'decision_id', v_decision_id
+        )
     );
 
     INSERT INTO drawing_outbox (
