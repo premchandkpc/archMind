@@ -89,3 +89,12 @@ def test_revision_text_placeholder_is_not_accepted_as_a_candidate() -> None:
     assert result.status == "unmatched"
     assert result.candidate_revision_labels == ()
     assert result.revision_label is None
+
+
+
+def test_complete_dotted_revision_label_is_preserved() -> None:
+    result = parse_title_block_text("Sheet No: A101\nRevision: R5.1")
+
+    assert result.status == "matched"
+    assert result.revision_label == "R5.1"
+    assert result.candidate_revision_labels == ("R5.1",)
