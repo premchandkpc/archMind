@@ -12,19 +12,19 @@ from dataclasses import asdict, dataclass
 
 SHEET_PATTERNS = (
     re.compile(
-        r"\\b(?:sheet\\s*(?:no\\.?|number|#)?|drawing\\s*(?:no\\.?|number|#))"
-        r"\\s*[:#-]?\\s*([A-Z]{1,5}[-.]?\\d{1,5}(?:\\.\\d{1,3})?)\\b",
+        r"\b(?:sheet\s*(?:no\.?|number|#)?|drawing\s*(?:no\.?|number|#))"
+        r"\s*[:#-]?\s*([A-Z]{1,5}[-.]?\d{1,5}(?:\.\d{1,3})?)\b",
         re.I,
     ),
 )
 REVISION_PATTERN = re.compile(
-    r"\\b(?:revision|rev\\.?|issue\\s*rev\\.?)"
-    r"\\s*(?:(?:no\\.?|number)\\s*)?[:#-]?\\s*"
-    r"([A-Z]{1,2}\\d{0,3}|\\d{1,3}|[A-Z]{1,3})(?![A-Z0-9/])",
+    r"\b(?:revision|rev\.?|issue\s*rev\.?)"
+    r"\s*(?:(?:no\.?|number)\s*)?[:#-]?\s*"
+    r"([A-Z]{1,2}\d{0,3}|\d{1,3}|[A-Z]{1,3})(?![A-Z0-9/])",
     re.I,
 )
 PROJECT_PATTERN = re.compile(
-    r"\\bproject\\s*(?:name|title)?\\s*[:#-]\\s*([^\\r\\n]{2,100})", re.I
+    r"\bproject\s*(?:name|title)?\s*[:#-]\s*([^\r\n]{2,100})", re.I
 )
 REVISION_PLACEHOLDERS = {"-", "NA", "N/A", "NONE", "TBD", "UNKNOWN", "NOTAPPLICABLE"}
 
@@ -93,7 +93,11 @@ def parse_title_block_text(text: str) -> TitleBlockResult:
         if len(candidates) > 1
     )
     status = "matched" if sheet_number and revision_label else "unmatched"
-    confidence = 0.95 if status == "matched" else (0.25 if sheet_candidates or revision_candidates else 0.0)
+    confidence = (
+        0.95 if status == "matched"
+        else 0.25 if sheet_candidates or revision_candidates
+        else 0.0
+    )
 
     return TitleBlockResult(
         sheet_number=sheet_number,
