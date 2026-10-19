@@ -38,3 +38,45 @@ def test_unlabelled_code_is_not_assumed_to_be_sheet_number() -> None:
 
     assert result.sheet_number is None
     assert result.status == "unmatched"
+
+
+
+def test_revision_no_label_is_skipped_before_revision_value() -> None:
+    result = parse_title_block_text("Sheet No: A101\nRevision No: R5")
+
+    assert result.status == "matched"
+    assert result.sheet_number == "A101"
+    assert result.revision_label == "R5"
+    assert result.candidate_revision_labels == ("R5",)
+
+
+def test_revision_placeholder_is_not_accepted_as_a_candidate() -> None:
+    result = parse_title_block_text("Sheet No: A101\nRevision: N/A")
+
+    assert result.status == "unmatched"
+    assert result.sheet_number == "A101"
+    assert result.revision_label is None
+    assert result.candidate_revision_labels == ()
+    assert "revision_label" in result.missing_fields
+
+
+def test_conflicting_sheet_candidates_require_human_review() -> None:
+    result = parse_title_block_text(
+        "Sheet No: A-101\nSheet No: S-202\nRevision: R5"
+    )
+
+    assert result.status == "unmatched"
+    assert result.sheet_number is None
+    assert result.candidate_sheet_numbers == ("A-101", "S-202")
+    assert result.ambiguous_fields == ("sheet_number",)
+
+
+def test_conflicting_revision_candidates_require_human_review() -> None:
+    result = parse_title_block_text(
+        "Sheet Number: A101\nRevision: R4\nRevision Number: R5"
+    )
+
+    assert result.status == "unmatched"
+    assert result.revision_label is None
+    assert result.candidate_revision_labels == ("R4", "R5")
+    assert result.ambiguous_fields == ("revision_label",)
