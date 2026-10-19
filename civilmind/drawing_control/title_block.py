@@ -20,7 +20,8 @@ SHEET_PATTERNS = (
 REVISION_PATTERN = re.compile(
     r"\b(?:revision|rev\.?|issue\s*rev\.?)"
     r"\s*(?:(?:no\.?|number)\s*)?[:#-]?\s*"
-    r"([A-Z]{1,2}\d{0,3}|\d{1,3}|[A-Z]{1,3})(?![A-Z0-9/])",
+    r"([A-Z]{1,2}\d{0,3}|\d{1,3}|[A-Z]{1,3})"
+    r"(?![A-Z0-9/])(?!\s+(?:APPLICABLE|AVAILABLE|ASSIGNED|KNOWN)\b)",
     re.I,
 )
 PROJECT_PATTERN = re.compile(
