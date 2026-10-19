@@ -83,10 +83,12 @@ class DesignSnapshot:
 
 @dataclass(frozen=True, slots=True)
 class PropertyChange:
-    """Before/after value for one property."""
+    """Before/after value for one property, preserving missing versus explicit null."""
 
     before: JsonValue
     after: JsonValue
+    before_present: bool = True
+    after_present: bool = True
 
 
 @dataclass(frozen=True, slots=True)
@@ -97,6 +99,19 @@ class DesignChange:
     operation: str
     kind: str
     changed_properties: dict[str, PropertyChange] = field(default_factory=dict)
+
+
+@dataclass(frozen=True, slots=True)
+class RelationshipChange:
+    """Added, removed, or updated dependency relationship."""
+
+    operation: str
+    source_id: str
+    target_id: str
+    relation_type: str
+    provenance: str
+    before_confidence: float | None
+    after_confidence: float | None
 
 
 @dataclass(frozen=True, slots=True)
@@ -148,19 +163,60 @@ def compare_snapshots(base: DesignSnapshot, head: DesignSnapshot) -> list[Design
             continue
 
         property_names = old.properties.keys() | new.properties.keys()
-        changed = {
-            name: PropertyChange(
-                before=old.properties.get(name),
-                after=new.properties.get(name),
-            )
-            for name in sorted(property_names)
-            if old.properties.get(name) != new.properties.get(name)
-        }
+        changed: dict[str, PropertyChange] = {}
+        for name in sorted(property_names):
+            before_present = name in old.properties
+            after_present = name in new.properties
+            before_value = old.properties.get(name)
+            after_value = new.properties.get(name)
+            if before_present != after_present or before_value != after_value:
+                changed[name] = PropertyChange(
+                    before=before_value,
+                    after=after_value,
+                    before_present=before_present,
+                    after_present=after_present,
+                )
         if old.kind != new.kind:
             changed["$kind"] = PropertyChange(before=old.kind, after=new.kind)
         if changed:
             changes.append(DesignChange(object_id, "updated", new.kind, changed))
 
+    return changes
+
+
+def compare_relationships(
+    base: DesignSnapshot, head: DesignSnapshot
+) -> list[RelationshipChange]:
+    """Diff dependency edges, including changes in relationship confidence."""
+    def index(snapshot: DesignSnapshot) -> dict[tuple[str, str, str, str], Relationship]:
+        return {
+            (edge.source_id, edge.target_id, edge.relation_type, edge.provenance): edge
+            for edge in snapshot.relationships
+        }
+
+    before = index(base)
+    after = index(head)
+    changes: list[RelationshipChange] = []
+    for key in sorted(before.keys() | after.keys()):
+        old = before.get(key)
+        new = after.get(key)
+        if old is None and new is not None:
+            changes.append(
+                RelationshipChange("added", *key, before_confidence=None, after_confidence=new.confidence)
+            )
+        elif new is None and old is not None:
+            changes.append(
+                RelationshipChange("removed", *key, before_confidence=old.confidence, after_confidence=None)
+            )
+        elif old is not None and new is not None and old.confidence != new.confidence:
+            changes.append(
+                RelationshipChange(
+                    "updated",
+                    *key,
+                    before_confidence=old.confidence,
+                    after_confidence=new.confidence,
+                )
+            )
     return changes
 
 
