@@ -11,8 +11,13 @@ from dataclasses import dataclass, field
 from math import isfinite
 from typing import TypeAlias
 
+from typing_extensions import TypeAliasType
+
 JsonScalar: TypeAlias = str | int | float | bool | None
-JsonValue: TypeAlias = JsonScalar | list["JsonValue"] | dict[str, "JsonValue"]
+JsonValue = TypeAliasType(
+    "JsonValue",
+    JsonScalar | list["JsonValue"] | dict[str, "JsonValue"],
+)
 
 
 def _validate_confidence(value: float, name: str) -> None:
