@@ -51,8 +51,8 @@ class SnapshotPayload(BaseModel):
     model_config = ConfigDict(extra="forbid")
 
     revision_id: str = Field(min_length=1, max_length=512)
-    objects: list[DesignObjectPayload] = Field(max_length=100_000)
-    relationships: list[RelationshipPayload] = Field(default_factory=list, max_length=500_000)
+    objects: list[DesignObjectPayload] = Field(max_length=10_000)
+    relationships: list[RelationshipPayload] = Field(default_factory=list, max_length=50_000)
 
 
 class AnalyzeRevisionRequest(BaseModel):
