@@ -65,7 +65,7 @@ class Relationship:
 
 @dataclass(frozen=True, slots=True)
 class DesignSnapshot:
-    """Immutable revision input from a CAD/BIM adapter."""
+    """Normalized revision input from a CAD/BIM adapter."""
 
     revision_id: str
     objects: tuple[DesignObject, ...]
