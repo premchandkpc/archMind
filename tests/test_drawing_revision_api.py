@@ -6,7 +6,6 @@ from io import BytesIO
 import pytest
 from fastapi import FastAPI
 from fastapi.testclient import TestClient
-
 from starlette.datastructures import UploadFile as StarletteUploadFile
 
 import civilmind.api.routes.drawing_revisions as drawing_revisions
@@ -35,7 +34,6 @@ def test_inspect_rejects_invalid_pdf_bytes() -> None:
     )
 
     assert response.status_code == 422
-
 
 
 @pytest.mark.asyncio
