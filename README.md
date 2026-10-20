@@ -38,6 +38,7 @@ The MVP should prefer a human-review queue over a confident-looking wrong match.
 
 ## Start here
 
+- [Product plan, discovery sprint, competitor landscape, and MVP roadmap](docs/product/README.md)
 - [Drawing-control prototype](docs/drawing-control/mock.html)
 - [MVP scope, validation plan, and production gates](docs/drawing-control/README.md)
 - [Proposed drawing-revision schema](sql/drawing_revision_control.sql)
@@ -54,11 +55,11 @@ PostgreSQL and object storage are the intended MVP baseline. Additional database
 
 ## What comes next
 
-1. Add a PostgreSQL migration and persist uploaded-file metadata and revision records; store the PDF in object storage.
-2. Build a human review inbox to confirm or correct sheet and revision values.
-3. Implement approval and transactional issue semantics, including four-eyes separation and one current issued revision per sheet.
-4. Add visual comparison and an append-only audit history.
-5. Validate the workflow with real drawing sets and a small group of construction users.
+1. Validate the customer problem with 10 interviews before expanding the product.
+2. Add a PostgreSQL migration and persist uploaded-file metadata and revision records; store the PDF in object storage.
+3. Build a human review inbox to confirm or correct sheet and revision values.
+4. Implement approval and transactional issue semantics, including four-eyes separation and one current issued revision per sheet.
+5. Add visual comparison or QR verification only if customer evidence justifies them.
 
 Success is measured by whether a team can reliably identify the current issued sheet and reconstruct who approved it and why, not by the number of infrastructure components in the diagram.
 
